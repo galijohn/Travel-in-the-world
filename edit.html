@@ -152,6 +152,7 @@
   .login-card h1 { margin: 0 0 4px; font-size: 22px; }
   .login-card .sub { color: var(--muted); margin: 0 0 16px; }
   .login-card .btn.primary { width: 100%; justify-content: center; padding: 10px; font-size: 16px; }
+  #loginForm.mode-password .token-only, #loginForm.mode-token .pw-only { display: none; }
   .login-error { color: var(--danger); min-height: 1.2em; line-height: 1.5; }
   .login-card ol { padding-inline-start: 18px; margin: 6px 0; line-height: 1.6; }
   .login-card a { color: var(--accent); }
@@ -185,13 +186,17 @@
   <form class="login-card stack" id="loginForm" autocomplete="on">
     <div>
       <h1>✏️ עריכת המפה</h1>
-      <p class="sub">כניסה עם מפתח ה-GitHub שלך</p>
+      <p class="sub pw-only">כניסה עם הסיסמה שלך</p>
+      <p class="sub token-only">כניסה עם מפתח ה-GitHub שלך</p>
     </div>
     <input type="hidden" name="username" autocomplete="username" value="travel-map">
-    <input type="password" name="token" autocomplete="current-password" placeholder="github_pat_..." dir="ltr" required>
+    <input class="pw-only" type="password" name="password" autocomplete="current-password" placeholder="סיסמה">
+    <input class="token-only" type="password" name="token" autocomplete="off" placeholder="github_pat_..." dir="ltr">
     <div class="login-error" id="loginError" role="alert"></div>
     <button class="btn primary" id="loginBtn">כניסה</button>
-    <details class="hint">
+    <a href="#" class="hint pw-only" id="useToken">כניסה עם מפתח GitHub במקום סיסמה</a>
+    <a href="#" class="hint token-only" id="usePassword">כניסה עם סיסמה</a>
+    <details class="hint token-only">
       <summary>איך יוצרים מפתח?</summary>
       <ol>
         <li>נכנסים ל-<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">יצירת Fine-grained token</a></li>
@@ -247,6 +252,16 @@
         <div><label class="f">ענף</label><input type="text" name="branch" dir="ltr" placeholder="אוטומטי"></div>
       </div>
     </details>
+    <h2>סיסמת כניסה</h2>
+    <div class="hint" id="pwState"></div>
+    <div class="row">
+      <div><input type="password" name="new_pw" autocomplete="new-password" placeholder="סיסמה חדשה"></div>
+      <div><input type="password" name="new_pw2" autocomplete="new-password" placeholder="שוב, לאימות"></div>
+    </div>
+    <div class="row" style="justify-content:flex-start">
+      <button class="btn" type="button" id="setPwBtn" style="flex:none">🔒 קביעת סיסמה</button>
+      <span class="hint">לפחות 12 תווים. משפט קצר עובד מצוין.</span>
+    </div>
     <h2>שמות במפה</h2>
     <div class="row">
       <div><label class="f">אני</label><input type="text" name="name_me"></div>
@@ -769,6 +784,8 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   const form = document.getElementById("settingsForm");
   function openSettings() {
     form.google_key.value = data.googleApiKey || "";
+    form.new_pw.value = form.new_pw2.value = "";
+    renderPwState();
     form.owner.value = settings.owner;
     form.repo.value = settings.repo;
     form.branch.value = settings.branch;
@@ -839,25 +856,93 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     dlg.close("cancel"); showLogin("");
   };
 
+  // --- password login --------------------------------------------------------
+  // The GitHub token is kept in the public repo encrypted with the owner's password
+  // (PBKDF2 + AES-GCM), so logging in on any device needs only the password.
+  const AUTH_PATH = "data/auth.json";
+  let auth = null;
+  async function loadAuth() {
+    try { const r = await fetch(AUTH_PATH + "?v=" + Date.now()); auth = r.ok ? await r.json() : null; }
+    catch { auth = null; }
+  }
+  const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function passwordKey(password, salt, iterations) {
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+      base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function encryptToken(token, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const iter = 600000;
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await passwordKey(password, salt, iter), new TextEncoder().encode(token));
+    return { v: 1, iter, salt: bytesToB64(salt), iv: bytesToB64(iv), ct: bytesToB64(new Uint8Array(ct)) };
+  }
+  async function decryptToken(a, password) {
+    const key = await passwordKey(password, unb64(a.salt), a.iter);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(a.iv) }, key, unb64(a.ct)));
+  }
+
   // --- login -----------------------------------------------------------------
   const loginForm = document.getElementById("loginForm");
+  const loginMode = mode => { loginForm.className = "login-card stack mode-" + mode; };
   function showLogin(error) {
     document.body.classList.add("locked");
+    loginMode(auth ? "password" : "token");
     document.getElementById("loginError").textContent = error || "";
-    loginForm.token.value = settings.token || "";
+    loginForm.password.value = "";
+    loginForm.token.value = "";
     setPick(null);
   }
+  document.getElementById("useToken").onclick = e => { e.preventDefault(); loginMode("token"); };
+  document.getElementById("usePassword").onclick = e => { e.preventDefault(); loginMode("password"); };
   loginForm.addEventListener("submit", async e => {
     e.preventDefault();
+    const err = document.getElementById("loginError");
     const btn = document.getElementById("loginBtn");
     btn.disabled = true; btn.textContent = "בודק...";
-    settings.token = loginForm.token.value.trim();
-    writeLS("travelEditor", settings);
-    await load();
-    btn.disabled = false; btn.textContent = "כניסה";
-    if (loadError) showLogin(loadError);
-    else document.body.classList.remove("locked");
+    try {
+      if (loginForm.classList.contains("mode-password")) {
+        try { settings.token = await decryptToken(auth, loginForm.password.value); }
+        catch { err.textContent = "סיסמה שגויה."; return; }
+      } else {
+        settings.token = loginForm.token.value.trim();
+        if (!settings.token) { err.textContent = "צריך להדביק מפתח."; return; }
+      }
+      writeLS("travelEditor", settings);
+      await load();
+      if (loadError) showLogin(loadError);
+      else document.body.classList.remove("locked");
+    } finally {
+      btn.disabled = false; btn.textContent = "כניסה";
+    }
   });
+
+  function renderPwState() {
+    document.getElementById("pwState").textContent = auth
+      ? "✓ יש סיסמה. אפשר להיכנס איתה מכל מכשיר. קביעה מחדש מחליפה אותה."
+      : "עוד אין סיסמה. בינתיים הכניסה היא עם מפתח GitHub.";
+  }
+  document.getElementById("setPwBtn").onclick = async () => {
+    const pw = form.new_pw.value, pw2 = form.new_pw2.value;
+    if (pw.length < 12) return toast("הסיסמה צריכה להיות לפחות 12 תווים.", true);
+    if (pw !== pw2) return toast("שתי הסיסמאות לא זהות.", true);
+    const btn = document.getElementById("setPwBtn");
+    btn.disabled = true; btn.textContent = "שומר...";
+    try {
+      const next = await encryptToken(settings.token, pw);
+      const content = b64encodeText(JSON.stringify(next, null, 2) + "\n");
+      await putFile(AUTH_PATH, content, "Update editor password", await currentSha(AUTH_PATH));
+      auth = next;
+      form.new_pw.value = form.new_pw2.value = "";
+      renderPwState();
+      toast("הסיסמה נקבעה ✓ מעכשיו אפשר להיכנס איתה מכל מכשיר");
+    } catch (e) {
+      toast("לא הצלחתי לשמור את הסיסמה: " + e.message, true);
+    } finally {
+      btn.disabled = false; btn.textContent = "🔒 קביעת סיסמה";
+    }
+  };
 
   document.getElementById("saveBtn").onclick = save;
   addEventListener("keydown", e => {
@@ -875,7 +960,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     toastTimer = setTimeout(() => t.classList.remove("show"), isError ? 8000 : 4000);
   }
 
-  await load();
+  await Promise.all([load(), loadAuth()]);
   if (settings.token && !loadError) document.body.classList.remove("locked");
   else showLogin(settings.token ? loadError : "");
 })();
