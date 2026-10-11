@@ -585,13 +585,32 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   }
   document.getElementById("bannerCancel").onclick = () => setPick(null);
 
+  // An open form is a history step: the phone's back button returns to the list
+  // instead of closing the editor.
+  let formInHistory = false;
+  function enterForm() {
+    if (formInHistory) return;
+    formInHistory = true;
+    history.pushState({ form: true }, "");
+  }
+  function leaveForm() {
+    if (formInHistory) history.back();  // popstate below does the rest
+    else { selected = null; setPick(null); renderAll(); }
+  }
+  addEventListener("popstate", () => {
+    formInHistory = false;
+    selected = null; setPick(null); renderAll();
+  });
+
   function selectPlace(p, fly) {
+    enterForm();
     tab = "places"; selected = p;
     if (fly && p.lat != null) flyTo(p.lat, p.lng, 0.9);
     renderAll();
   }
 
   function selectCountry(code, fly) {
+    enterForm();
     tab = "countries";
     let c = data.countries.find(x => x.code === code);
     if (!c) {
@@ -619,7 +638,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   }
   document.querySelector(".tabs").addEventListener("click", e => {
     const b = e.target.closest("button[data-tab]"); if (!b) return;
-    tab = b.dataset.tab; selected = null; setPick(null); renderAll();
+    tab = b.dataset.tab; leaveForm();
   });
 
   function renderStatus() {
@@ -734,12 +753,12 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
       </div>`;
     bindFields(p, () => renderGlobe());
     bindWhoToggle(p, () => { renderPlaceForm(p); renderGlobe(); });
-    document.getElementById("back").onclick = () => { selected = null; setPick(null); renderAll(); };
+    document.getElementById("back").onclick = leaveForm;
     document.getElementById("move").onclick = () => setPick("move");
     document.getElementById("del").onclick = () => {
       if (!confirm(`למחוק את "${p.name || "המקום"}"?`)) return;
       data.places.splice(data.places.indexOf(p), 1);
-      selected = null; markDirty(); renderAll();
+      markDirty(); leaveForm();
     };
   }
 
@@ -789,10 +808,10 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     bindFields(c, () => {});
     bindWhoToggle(c, () => { renderCountryForm(c); renderGlobe(); });
     body.querySelectorAll(".item[data-i]").forEach(b => b.onclick = () => selectPlace(data.places[+b.dataset.i], true));
-    document.getElementById("back").onclick = () => { selected = null; renderAll(); };
+    document.getElementById("back").onclick = leaveForm;
     document.getElementById("del").onclick = () => {
       data.countries.splice(data.countries.indexOf(c), 1);
-      selected = null; markDirty(); renderAll();
+      markDirty(); leaveForm();
     };
   }
 

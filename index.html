@@ -544,6 +544,7 @@
     document.getElementById("galleryGrid").innerHTML = galleryItems.map((m, i) =>
       `<button data-i="${i}"><img src="${thumb(m.id, 400)}" loading="lazy" alt="">${m.video ? `<span class="play">▶</span>` : ""}</button>`).join("");
     document.getElementById("gallery").classList.add("open");
+    pushLayer("gallery");
   }
 
   function openViewer(i) {
@@ -554,13 +555,33 @@
       : `<img src="${thumb(m.id, 2000)}" alt="">`;
     document.getElementById("viewerCount").textContent = `${viewerIndex + 1} מתוך ${galleryItems.length}`;
     document.getElementById("viewer").classList.add("open");
+    pushLayer("viewer");
     // warm up the next photo so swiping feels instant
     const next = galleryItems[(viewerIndex + 1) % galleryItems.length];
     if (next && !next.video) new Image().src = thumb(next.id, 2000);
   }
 
-  const closeViewer = () => { document.getElementById("viewer").classList.remove("open"); document.getElementById("viewerStage").innerHTML = ""; };
-  document.getElementById("galleryClose").onclick = () => document.getElementById("gallery").classList.remove("open");
+  // Each open layer (card, gallery, photo) is a history step, so the phone's back button
+  // closes the top one instead of leaving the site.
+  const layers = [];
+  function pushLayer(name) {
+    if (layers.includes(name)) return;
+    layers.push(name);
+    history.pushState({ layer: name }, "");
+  }
+  function hideLayer(name) {
+    if (name === "viewer") { document.getElementById("viewer").classList.remove("open"); document.getElementById("viewerStage").innerHTML = ""; }
+    if (name === "gallery") document.getElementById("gallery").classList.remove("open");
+    if (name === "card") { card.classList.remove("open"); setSheet(true); }
+  }
+  addEventListener("popstate", () => { const top = layers.pop(); if (top) hideLayer(top); });
+  // close buttons go through history too, keeping it in step with what is on screen
+  function closeLayer(name) {
+    if (layers[layers.length - 1] === name) history.back();
+    else { const i = layers.indexOf(name); if (i >= 0) layers.splice(i, 1); hideLayer(name); }
+  }
+  const closeViewer = () => closeLayer("viewer");
+  document.getElementById("galleryClose").onclick = () => closeLayer("gallery");
   document.getElementById("galleryGrid").addEventListener("click", e => {
     const b = e.target.closest("button[data-i]"); if (b) openViewer(+b.dataset.i);
   });
@@ -580,10 +601,11 @@
   function openCard(html) {
     card.innerHTML = `<button class="close" aria-label="סגור">×</button>` + html;
     card.classList.add("open");
+    pushLayer("card");
     globe.controls().autoRotate = false;
   }
   card.addEventListener("click", e => {
-    if (e.target.closest(".close")) { card.classList.remove("open"); return setSheet(true); }
+    if (e.target.closest(".close")) return closeLayer("card");
     const item = e.target.closest(".item[data-p]");
     if (item) return showPlace(places[+item.dataset.p]);
     const all = e.target.closest("[data-gallery]");
@@ -599,9 +621,7 @@
     if (viewerOpen && e.key === "ArrowLeft") return openViewer(viewerIndex + 1);
     if (viewerOpen && e.key === "ArrowRight") return openViewer(viewerIndex - 1);
     if (e.key !== "Escape") return;
-    if (viewerOpen) closeViewer();
-    else if (document.getElementById("gallery").classList.contains("open")) document.getElementById("gallery").classList.remove("open");
-    else card.classList.remove("open");
+    if (layers.length) closeLayer(layers[layers.length - 1]);
   });
 
   // --- helpers -------------------------------------------------------------
