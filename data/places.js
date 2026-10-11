@@ -48,11 +48,15 @@ window.TRAVEL = {
         "me",
         "partner"
       ]
+    },
+    {
+      "code": "CZE",
+      "who": "me"
     }
   ],
   "places": [
     {
-      "name": "צכיה",
+      "name": "פראג",
       "code": "CZE",
       "lat": 49.7439,
       "lng": 15.3381,
