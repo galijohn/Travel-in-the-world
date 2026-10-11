@@ -48,6 +48,7 @@
   .status .pill { padding: 2px 8px; border-radius: 999px; background: var(--field); }
   .status .pill.ok { color: var(--ok); }
   .status .pill.warn { color: var(--accent); }
+  .status .pill.error { color: var(--danger); border-radius: 10px; line-height: 1.5; white-space: normal; }
   .status a { color: var(--muted); }
 
   .btn {
@@ -238,7 +239,7 @@
   // --- state ---------------------------------------------------------------
   let data = null;            // { people, countries, places }
   let fileSha = null;         // sha of data/places.js on GitHub (null = not loaded from API / new file)
-  let loadError = false;
+  let loadError = "";         // why the last GitHub connection failed, in plain words
   let dirty = false;
   let tab = "places";
   let selected = null;        // place object or country object being edited
@@ -294,14 +295,13 @@
   function flyTo(lat, lng, altitude) { globe.pointOfView({ lat, lng, altitude }, 1000); }
 
   // --- loading -------------------------------------------------------------
+  const connKey = () => JSON.stringify([settings.token, settings.owner, settings.repo, settings.branch]);
+
   async function load() {
+    appliedConn = connKey();
     if (settings.token) {
       try {
-        // no branch chosen: use the repo's default branch (the one GitHub Pages serves)
-        if (!settings.branch) {
-          const repo = await (await gh("")).json();
-          settings.branch = repo.default_branch || "main";
-        }
+        await checkConnection();
         const r = await gh(`contents/${DATA_PATH}?ref=${encodeURIComponent(settings.branch)}`);
         if (r.status === 404) {
           // file not on this branch yet: start from what the site serves, create on save
@@ -313,18 +313,30 @@
           data = normalize(parseDataFile(b64decode(j.content)));
           fileSha = j.sha;
         }
-        loadError = false;
+        loadError = "";
       } catch (e) {
-        toast("לא הצלחתי לטעון מ-GitHub: " + e.message, true);
+        toast(e.message, true);
         data = normalize(await TravelCommon.loadSiteData());
         fileSha = null;
-        loadError = true;
+        loadError = e.message;
       }
     } else {
       data = normalize(await TravelCommon.loadSiteData());
     }
     dirty = false; selected = null;
     renderAll();
+  }
+
+  // Check the token against the repo and explain any problem in plain words
+  async function checkConnection() {
+    let r;
+    try { r = await gh(""); } catch { throw new Error("אין חיבור לאינטרנט, או ש-GitHub לא זמין כרגע."); }
+    if (r.status === 401) throw new Error("המפתח לא תקין: אולי הועתק רק חלק ממנו, או שפג תוקפו. כדאי ליצור מפתח חדש ולהדביק אותו שוב.");
+    if (r.status === 403 || r.status === 404) throw new Error(`למפתח אין גישה לריפו ${settings.owner}/${settings.repo}.`);
+    const repo = await r.json();
+    if (!r.ok) throw new Error(repo.message || String(r.status));
+    // no branch chosen: use the repo's default branch (the one GitHub Pages serves)
+    if (!settings.branch) settings.branch = repo.default_branch || "main";
   }
 
   function normalize(d) {
@@ -424,10 +436,14 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
         fileSha = await putFile(DATA_PATH, content, "Update travel map", await currentSha(DATA_PATH));
       }
       dirty = false;
-      loadError = false;
+      loadError = "";
       toast("נשמר ✓ המפה הציבורית תתעדכן בעוד כדקה");
     } catch (e) {
-      toast("השמירה נכשלה: " + e.message + (e.status === 401 || e.status === 403 || e.status === 404 ? " (בדוק את המפתח וההרשאות בהגדרות)" : ""), true);
+      const why =
+        e.status === 401 ? "המפתח לא תקין או שפג תוקפו. כדאי ליצור מפתח חדש." :
+        e.status === 403 || e.status === 404 ? "למפתח אין הרשאת כתיבה. ב-GitHub צריך לערוך את המפתח: Repository access ← Only select repositories ← Travel-in-the-world, ו-Repository permissions ← Contents ← Read and write." :
+        e.message;
+      toast("השמירה נכשלה: " + why, true);
     } finally {
       btn.textContent = "שמירה";
       renderStatus();
@@ -532,7 +548,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   function renderStatus() {
     const s = document.getElementById("status");
     const conn = settings.token
-      ? (!loadError ? `<span class="pill ok">מחובר ל-GitHub · ${esc(settings.branch)}</span>` : `<span class="pill warn">שגיאת חיבור</span>`)
+      ? (!loadError ? `<span class="pill ok">מחובר ל-GitHub · ${esc(settings.branch)}</span>` : `<span class="pill error">⚠️ ${esc(loadError)}</span>`)
       : `<span class="pill warn">לא מחובר · אפשר לערוך אבל לא לשמור</span> <a href="#" id="connectLink">התחברות</a>`;
     s.innerHTML = conn + (dirty ? `<span class="pill warn">יש שינויים שלא נשמרו</span>` : "");
     document.getElementById("connectLink")?.addEventListener("click", e => { e.preventDefault(); openSettings(); });
@@ -718,18 +734,27 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     dlg.showModal();
   }
   document.getElementById("settingsBtn").onclick = openSettings;
+  // Keep the token as soon as it is pasted: on a phone the dialog is often closed with
+  // the back button, or the page reloads after visiting GitHub to create the token.
+  let appliedConn = "";
+  const formSettings = () => ({
+    token: form.token.value.trim(),
+    owner: form.owner.value.trim(),
+    repo: form.repo.value.trim(),
+    branch: form.branch.value.trim(),
+  });
+  form.addEventListener("input", () => writeLS("travelEditor", { ...settings, ...formSettings() }));
+
   dlg.addEventListener("close", async () => {
-    if (dlg.returnValue !== "save") return;
-    const before = JSON.stringify([settings.token, settings.owner, settings.repo, settings.branch]);
-    Object.assign(settings, {
-      token: form.token.value.trim(),
-      owner: form.owner.value.trim(),
-      repo: form.repo.value.trim(),
-      branch: form.branch.value.trim(),
-    });
+    if (dlg.returnValue === "cancel") {
+      writeLS("travelEditor", settings);  // undo what was typed
+      return;
+    }
+    const before = appliedConn;
+    Object.assign(settings, formSettings());
     writeLS("travelEditor", settings);
     renderStatus();
-    if (before !== JSON.stringify([settings.token, settings.owner, settings.repo, settings.branch]) && settings.token) {
+    if (before !== connKey() && settings.token) {
       // keep unsaved edits; otherwise pull the latest version from GitHub
       if (dirty) fileSha = null;
       else await load();
