@@ -50,5 +50,15 @@ window.TRAVEL = {
       ]
     }
   ],
-  "places": []
+  "places": [
+    {
+      "name": "צכיה",
+      "code": "CZE",
+      "lat": 49.7439,
+      "lng": 15.3381,
+      "who": "me",
+      "album": "https://drive.google.com/drive/u/0/folders/16ew7w1pCK4C4SIxz2nipUd1x6MJkaq_W",
+      "date": "2026-04"
+    }
+  ]
 };
