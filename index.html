@@ -2,10 +2,17 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>המסע שלנו בעולם</title>
 <meta name="description" content="גלובוס של כל המקומות שהיינו בהם — יחד ולחוד">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+<link rel="icon" href="icons/map-192.png">
+<meta name="theme-color" content="#05070f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/map-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="המסע שלנו">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -154,7 +161,8 @@
       border-radius: 18px 18px 0 0;
       transition: transform .25s ease;
     }
-    .panel.collapsed { transform: translateY(calc(100% - 132px)); }
+    .panel { padding-bottom: env(safe-area-inset-bottom); }
+    .panel.collapsed { transform: translateY(calc(100% - 132px - env(safe-area-inset-bottom))); }
     header { padding: 12px 16px 6px; }
     h1 { font-size: 18px; }
     .stats, .filters { padding-left: 16px; padding-right: 16px; }
@@ -163,7 +171,7 @@
       width: 44px; height: 5px; border: 0; padding: 0;
       background: rgba(255,255,255,0.3); border-radius: 3px; cursor: pointer;
     }
-    .card { left: 16px; right: 16px; width: auto; top: 16px; bottom: auto; max-height: 40%; }
+    .card { left: 16px; right: 16px; width: auto; top: calc(16px + env(safe-area-inset-top)); bottom: auto; max-height: 40%; }
   }
 </style>
 </head>
@@ -395,6 +403,9 @@
 
   render();
 })();
+</script>
+<script>
+  if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
 </body>
 </html>

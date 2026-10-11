@@ -2,10 +2,17 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>עריכת המפה</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✏️</text></svg>">
+<link rel="icon" href="icons/edit-192.png">
+<meta name="theme-color" content="#05070f">
+<link rel="manifest" href="manifest-edit.webmanifest">
+<link rel="apple-touch-icon" href="icons/edit-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="עריכת המפה">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -130,8 +137,21 @@
   }
 
   @media (max-width: 700px) {
-    .panel { top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 58%; border-radius: 18px 18px 0 0; }
-    .toast { left: 12px; right: 12px; bottom: auto; top: 12px; }
+    .panel {
+      top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 58%;
+      border-radius: 18px 18px 0 0; transition: height .25s ease;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* editing a place: give the form most of the screen */
+    .panel.editing { height: 82%; }
+    /* picking a spot: get out of the globe's way */
+    .panel.picking { height: 30%; }
+    .topbar { padding-top: 12px; }
+    /* 16px stops iOS from zooming into focused fields */
+    input[type=text], input[type=url], input[type=password], input[type=number], input[type=month], select, textarea { font-size: 16px; }
+    .btn, .who-toggle button, .item { min-height: 40px; }
+    .toast { left: 12px; right: 12px; bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
+    .banner { top: calc(16px + env(safe-area-inset-top)); white-space: nowrap; }
   }
 </style>
 </head>
@@ -140,7 +160,7 @@
 <div class="banner" id="banner"><span id="bannerText"></span><button id="bannerCancel">ביטול</button></div>
 <div class="toast" id="toast"></div>
 
-<aside class="panel">
+<aside class="panel" id="panel">
   <div class="topbar">
     <h1>✏️ עריכת המפה</h1>
     <a class="btn icon" href="./" target="_blank" title="לצפייה במפה">👁️</a>
@@ -173,11 +193,14 @@
         המפתח נשמר רק בדפדפן הזה ולא נשלח לשום מקום חוץ מ-GitHub.
       </details>
     </div>
-    <div class="row">
-      <div><label class="f">משתמש</label><input type="text" name="owner" dir="ltr"></div>
-      <div><label class="f">ריפו</label><input type="text" name="repo" dir="ltr"></div>
-      <div><label class="f">ענף</label><input type="text" name="branch" dir="ltr"></div>
-    </div>
+    <details class="hint">
+      <summary>מתקדם</summary>
+      <div class="row" style="margin-top:8px">
+        <div><label class="f">משתמש</label><input type="text" name="owner" dir="ltr"></div>
+        <div><label class="f">ריפו</label><input type="text" name="repo" dir="ltr"></div>
+        <div><label class="f">ענף</label><input type="text" name="branch" dir="ltr"></div>
+      </div>
+    </details>
     <h2>שמות במפה</h2>
     <div class="row">
       <div><label class="f">אני</label><input type="text" name="name_me"></div>
@@ -457,6 +480,8 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
 
   function setPick(mode) {
     pickMode = mode;
+    document.getElementById("panel").classList.toggle("editing", !!selected && !mode);
+    document.getElementById("panel").classList.toggle("picking", !!mode);
     const b = document.getElementById("banner");
     b.classList.toggle("show", !!mode);
     document.getElementById("bannerText").textContent =
@@ -514,6 +539,8 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   const body = document.getElementById("body");
 
   function renderBody() {
+    // in pick mode the globe needs the screen, otherwise an open form does
+    document.getElementById("panel").classList.toggle("editing", !!selected && !pickMode);
     if (tab === "places") selected ? renderPlaceForm(selected) : renderPlaceList();
     else selected ? renderCountryForm(selected) : renderCountryList();
   }
@@ -733,6 +760,9 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   await load();
   if (!settings.token) openSettings();
 })();
+</script>
+<script>
+  if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
 </body>
 </html>
