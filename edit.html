@@ -198,7 +198,7 @@
       <div class="row" style="margin-top:8px">
         <div><label class="f">משתמש</label><input type="text" name="owner" dir="ltr"></div>
         <div><label class="f">ריפו</label><input type="text" name="repo" dir="ltr"></div>
-        <div><label class="f">ענף</label><input type="text" name="branch" dir="ltr"></div>
+        <div><label class="f">ענף</label><input type="text" name="branch" dir="ltr" placeholder="אוטומטי"></div>
       </div>
     </details>
     <h2>שמות במפה</h2>
@@ -231,7 +231,7 @@
     const repo = location.pathname.split("/").filter(Boolean)[0];
     return m && repo ? { owner: m[1], repo } : { owner: "galijohn", repo: "Travel-in-the-world" };
   };
-  const settings = Object.assign({ token: "", branch: "main", ...guessRepo() }, readLS("travelEditor") || {});
+  const settings = Object.assign({ token: "", branch: "", ...guessRepo() }, readLS("travelEditor") || {});
   function readLS(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
   function writeLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
@@ -297,6 +297,11 @@
   async function load() {
     if (settings.token) {
       try {
+        // no branch chosen: use the repo's default branch (the one GitHub Pages serves)
+        if (!settings.branch) {
+          const repo = await (await gh("")).json();
+          settings.branch = repo.default_branch || "main";
+        }
         const r = await gh(`contents/${DATA_PATH}?ref=${encodeURIComponent(settings.branch)}`);
         if (r.status === 404) {
           // file not on this branch yet: start from what the site serves, create on save
@@ -369,7 +374,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
 
   // --- GitHub API ----------------------------------------------------------
   function gh(path, opts = {}) {
-    return fetch(`https://api.github.com/repos/${settings.owner}/${settings.repo}/${path}`, {
+    return fetch(`https://api.github.com/repos/${settings.owner}/${settings.repo}${path ? "/" + path : ""}`, {
       ...opts,
       headers: {
         Accept: "application/vnd.github+json",
@@ -720,9 +725,10 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
       token: form.token.value.trim(),
       owner: form.owner.value.trim(),
       repo: form.repo.value.trim(),
-      branch: form.branch.value.trim() || "main",
+      branch: form.branch.value.trim(),
     });
     writeLS("travelEditor", settings);
+    renderStatus();
     if (before !== JSON.stringify([settings.token, settings.owner, settings.repo, settings.branch]) && settings.token) {
       // keep unsaved edits; otherwise pull the latest version from GitHub
       if (dirty) fileSha = null;
