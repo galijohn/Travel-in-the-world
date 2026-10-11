@@ -7,6 +7,10 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="icons/edit-192.png">
 <meta name="theme-color" content="#05070f">
+<script>
+  // catch Chrome's "can install" signal even if it fires before the page's scripts load
+  addEventListener("beforeinstallprompt", e => { e.preventDefault(); window.__installEvent = e; });
+</script>
 <link rel="manifest" href="manifest-edit.webmanifest">
 <link rel="apple-touch-icon" href="icons/edit-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -61,6 +65,7 @@
   .btn.primary { background: var(--accent); color: #1b1400; border-color: transparent; font-weight: 500; }
   .btn.danger { color: var(--danger); }
   .btn.icon { padding: 7px 9px; }
+  .btn[hidden] { display: none; }
 
   .tabs { display: flex; gap: 4px; padding: 0 14px; border-bottom: 1px solid var(--border); }
   .tabs button {
@@ -208,6 +213,7 @@
       </ol>
       המפתח נשמר רק במכשיר הזה.
     </details>
+    <button class="btn" type="button" id="installBtnLogin" hidden>📲 התקנת עורך המפה כאפליקציה</button>
     <a class="hint" href="./">👁️ לצפייה במפה</a>
   </form>
 </div>
@@ -216,6 +222,7 @@
   <div class="topbar">
     <h1>✏️ עריכת המפה</h1>
     <a class="btn icon" href="./" target="_blank" title="לצפייה במפה">👁️</a>
+    <button class="btn" id="installBtn" hidden>📲 התקנה</button>
     <button class="btn icon" id="settingsBtn" title="הגדרות">⚙️</button>
     <button class="btn primary" id="saveBtn" disabled>שמירה</button>
   </div>
@@ -974,6 +981,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     toastTimer = setTimeout(() => t.classList.remove("show"), isError ? 8000 : 4000);
   }
 
+  TravelCommon.installButtons([document.getElementById("installBtn"), document.getElementById("installBtnLogin")]);
   await loadAuth();
   if (auth) {
     // a password exists: a token remembered on the device no longer counts

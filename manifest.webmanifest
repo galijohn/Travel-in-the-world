@@ -1,7 +1,7 @@
 {
   "name": "המסע שלנו בעולם",
   "short_name": "המסע שלנו",
-  "description": "גלובוס של כל המקומות שהיינו בהם, יחד ולחוד",
+  "description": "גלובוס אינטראקטיבי של כל המקומות שהיינו בהם, יחד ולחוד, עם התמונות מכל טיול",
   "lang": "he",
   "dir": "rtl",
   "id": "./",
@@ -12,7 +12,51 @@
   "background_color": "#05070f",
   "theme_color": "#05070f",
   "icons": [
-    { "src": "icons/map-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/map-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "icons/map-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/map-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "travel",
+    "photo"
+  ],
+  "screenshots": [
+    {
+      "src": "icons/screenshot-globe.jpg",
+      "sizes": "810x1440",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "הגלובוס עם כל המקומות"
+    },
+    {
+      "src": "icons/screenshot-place.jpg",
+      "sizes": "810x1440",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "כרטיס מקום עם התמונות מהטיול"
+    },
+    {
+      "src": "icons/screenshot-gallery.jpg",
+      "sizes": "810x1440",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "גלריית התמונות"
+    },
+    {
+      "src": "icons/screenshot-wide.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "המפה במחשב"
+    }
   ]
 }

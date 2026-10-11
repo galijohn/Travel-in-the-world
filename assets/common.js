@@ -1,5 +1,30 @@
 // Shared helpers for the viewer (index.html) and the editor (edit.html).
 window.TravelCommon = (() => {
+  // Chrome announces once that the page can be installed as a real app; this can happen
+  // before the page finishes loading, so catch it right away and let pages hook in later.
+  let installEvent = window.__installEvent || null;  // caught early by the page's head script
+  const installWatchers = [];
+  addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    installEvent = e;
+    installWatchers.forEach(f => f(true));
+  });
+  addEventListener("appinstalled", () => { installEvent = null; installWatchers.forEach(f => f(false)); });
+
+  // Show the given buttons while an install is available; clicking opens Chrome's install dialog
+  function installButtons(buttons) {
+    buttons = buttons.filter(Boolean);
+    const show = on => buttons.forEach(b => { b.hidden = !on; });
+    show(!!installEvent);
+    installWatchers.push(show);
+    buttons.forEach(b => b.addEventListener("click", async () => {
+      if (!installEvent) return;
+      installEvent.prompt();
+      const { outcome } = await installEvent.userChoice;
+      if (outcome === "accepted") { installEvent = null; show(false); }
+    }));
+  }
+
   const SEPARATE = { name: "כל אחד בנפרד", color: "#b388ff" };
   const regionNames = (() => { try { return new Intl.DisplayNames(["he"], { type: "region" }); } catch { return null; } })();
 
@@ -104,5 +129,5 @@ window.TravelCommon = (() => {
       .then(geo => geo.features.filter(f => f.properties.code !== "ATA"));
   }
 
-  return { SEPARATE, asList, category, catInfo, whoLabel, aggregateCountries, countryName, centroid, hexA, esc, driveFolderId, realisticGlobe, loadSiteData, loadCountries };
+  return { SEPARATE, asList, category, catInfo, whoLabel, aggregateCountries, countryName, centroid, hexA, esc, driveFolderId, realisticGlobe, installButtons, loadSiteData, loadCountries };
 })();

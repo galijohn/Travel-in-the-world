@@ -1,6 +1,6 @@
 // Offline support: pages and data are network-first (always fresh when online),
 // heavy static files are cache-first.
-const CACHE = "travel-v3";
+const CACHE = "travel-v4";
 const SHELL = [
   "./", "index.html", "edit.html",
   "assets/common.js", "assets/earth.jpg", "assets/night-sky.png",

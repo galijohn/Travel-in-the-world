@@ -9,6 +9,10 @@
 <meta name="description" content="גלובוס של כל המקומות שהיינו בהם — יחד ולחוד">
 <link rel="icon" href="icons/map-192.png">
 <meta name="theme-color" content="#05070f">
+<script>
+  // catch Chrome's "can install" signal even if it fires before the page's scripts load
+  addEventListener("beforeinstallprompt", e => { e.preventDefault(); window.__installEvent = e; });
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/map-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -54,6 +58,13 @@
   }
   header { padding: 18px 18px 10px; }
   h1 { margin: 0; font-size: 22px; font-weight: 700; }
+  .title-row { display: flex; align-items: center; gap: 8px; }
+  .title-row h1 { flex: 1; }
+  .install {
+    font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; flex: none;
+    color: #1b1400; background: var(--together); border: 0; border-radius: 999px; padding: 6px 12px;
+  }
+  .install[hidden] { display: none; }
   .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
   .stats {
@@ -228,7 +239,10 @@
 <aside class="panel collapsed" id="panel">
   <button class="toggle-panel" id="togglePanel" aria-label="פתח/סגור רשימה"></button>
   <header>
-    <h1>המסע שלנו בעולם 🌍</h1>
+    <div class="title-row">
+      <h1>המסע שלנו בעולם 🌍</h1>
+      <button class="install" id="installBtn" hidden>📲 התקנה</button>
+    </div>
     <p class="subtitle" id="subtitle"></p>
   </header>
   <div class="stats" id="stats"></div>
@@ -475,7 +489,7 @@
     if (!items.length) return `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לתמונות מהטיול</a>`;
     const preview = items.slice(0, 4).map((m, i) => `<button data-open="${i}" aria-label="תמונה ${i + 1}">
         <img src="${thumb(m.id, 300)}" loading="lazy" alt="">${m.video ? `<span class="play">▶</span>` : ""}
-        ${i === 3 && items.length > 4 ? `<span class="more">+${items.length - 3}</span>` : ""}</button>`).join("");
+        ${i === 3 && items.length > 4 ? `<span class="more" dir="ltr">+${items.length - 3}</span>` : ""}</button>`).join("");
     return `<div class="strip" data-album="${esc(url)}" data-title="${esc(title)}">${preview}</div>
       <button class="album" data-gallery="${esc(url)}" data-title="${esc(title)}">📷 כל התמונות (${items.length})</button>`;
   }
@@ -557,6 +571,7 @@
     return f ? f.properties : { code, iso2: "", name: code };
   }
 
+  TravelCommon.installButtons([document.getElementById("installBtn")]);
   render();
 })();
 </script>

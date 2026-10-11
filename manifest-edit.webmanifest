@@ -12,7 +12,51 @@
   "background_color": "#05070f",
   "theme_color": "#05070f",
   "icons": [
-    { "src": "icons/edit-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/edit-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "icons/edit-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/edit-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "travel",
+    "photo"
+  ],
+  "screenshots": [
+    {
+      "src": "icons/screenshot-globe.jpg",
+      "sizes": "810x1440",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "הגלובוס עם כל המקומות"
+    },
+    {
+      "src": "icons/screenshot-place.jpg",
+      "sizes": "810x1440",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "כרטיס מקום עם התמונות מהטיול"
+    },
+    {
+      "src": "icons/screenshot-gallery.jpg",
+      "sizes": "810x1440",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "גלריית התמונות"
+    },
+    {
+      "src": "icons/screenshot-wide.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "המפה במחשב"
+    }
   ]
 }
