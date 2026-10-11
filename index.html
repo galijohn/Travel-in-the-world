@@ -7,6 +7,15 @@
 <!-- Drive serves photos to embedding pages only without a referrer -->
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="גלובוס של כל המקומות שהיינו בהם — יחד ולחוד">
+<meta property="og:type" content="website">
+<meta property="og:title" content="המסע שלנו בעולם 🌍">
+<meta property="og:description" content="גלובוס של כל המקומות שהיינו בהם, יחד ולחוד, עם התמונות מכל טיול">
+<meta property="og:url" content="https://galijohn.github.io/Travel-in-the-world/">
+<meta property="og:image" content="https://galijohn.github.io/Travel-in-the-world/icons/screenshot-wide.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta property="og:locale" content="he_IL">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="icons/map-192.png">
 <meta name="theme-color" content="#05070f">
 <script>
@@ -65,6 +74,10 @@
     color: #1b1400; background: var(--together); border: 0; border-radius: 999px; padding: 6px 12px;
   }
   .install[hidden] { display: none; }
+  .share {
+    font: inherit; font-size: 13px; cursor: pointer; flex: none; color: var(--text);
+    background: rgba(255,255,255,0.08); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;
+  }
   .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
   .stats {
@@ -208,6 +221,7 @@
   }
 
   .toggle-panel { display: none; }
+  .subtitle .list-hint { display: none; color: var(--together); }
 
   @media (max-width: 700px) {
     .panel {
@@ -218,7 +232,11 @@
       transition: transform .25s ease;
     }
     .panel { padding-bottom: env(safe-area-inset-bottom); }
-    .panel.collapsed { transform: translateY(calc(100% - 132px - env(safe-area-inset-bottom))); }
+    .panel.collapsed { transform: translateY(calc(100% - 118px - env(safe-area-inset-bottom))); }
+    header { cursor: pointer; }
+    .subtitle .list-hint { display: inline; }
+    .panel.collapsed .list-hint::after { content: " ▲"; }
+    .panel:not(.collapsed) .list-hint::after { content: " ▼"; }
     header { padding: 12px 16px 6px; }
     h1 { font-size: 18px; }
     .stats, .filters { padding-left: 16px; padding-right: 16px; }
@@ -236,14 +254,15 @@
 <body>
 <div id="globe" aria-label="גלובוס אינטראקטיבי"></div>
 
-<aside class="panel collapsed" id="panel">
+<aside class="panel" id="panel">
   <button class="toggle-panel" id="togglePanel" aria-label="פתח/סגור רשימה"></button>
   <header>
     <div class="title-row">
       <h1>המסע שלנו בעולם 🌍</h1>
       <button class="install" id="installBtn" hidden>📲 התקנה</button>
+      <button class="share" id="shareBtn">🔗 שיתוף</button>
     </div>
-    <p class="subtitle" id="subtitle"></p>
+    <p class="subtitle"><span id="subtitle"></span> <span class="list-hint" id="listHint">· רשימת המקומות</span></p>
   </header>
   <div class="stats" id="stats"></div>
   <div class="filters" id="filters"></div>
@@ -321,6 +340,9 @@
     .ringMaxRadius(3)
     .ringPropagationSpeed(1.5)
     .ringRepeatPeriod(1600);
+
+  // touch screens have no hover: tooltips would just stick on screen after a tap
+  if (matchMedia("(hover: none)").matches) globe.polygonLabel(() => "").pointLabel(() => "");
 
   globe.controls().autoRotate = true;
   globe.controls().autoRotateSpeed = 0.35;
@@ -407,13 +429,33 @@
     else showCountry(countryProps(b.dataset.c));
   });
 
+  // On phones the list is a bottom sheet: open on arrival, folded away while a place is shown
   const panel = document.getElementById("panel");
+  const isPhone = () => matchMedia("(max-width: 700px)").matches;
+  const setSheet = open => { if (isPhone()) panel.classList.toggle("collapsed", !open); };
   document.getElementById("togglePanel").addEventListener("click", () => panel.classList.toggle("collapsed"));
+  panel.querySelector("header").addEventListener("click", e => {
+    if (isPhone() && !e.target.closest("button")) panel.classList.toggle("collapsed");
+  });
+
+  // share: the phone's own share sheet (WhatsApp, messages...), or copy the link
+  const shareBtn = document.getElementById("shareBtn");
+  shareBtn.addEventListener("click", async () => {
+    const url = "https://galijohn.github.io/Travel-in-the-world/";
+    if (navigator.share) {
+      try { await navigator.share({ title: "המסע שלנו בעולם 🌍", text: "המפה של כל המקומות שהיינו בהם", url }); } catch {}
+      return;
+    }
+    try { await navigator.clipboard.writeText(url); shareBtn.textContent = "✓ הקישור הועתק"; }
+    catch { prompt("העתיקו את הקישור:", url); }
+    setTimeout(() => { shareBtn.textContent = "🔗 שיתוף"; }, 2500);
+  });
 
   // --- details card --------------------------------------------------------
   const card = document.getElementById("card");
 
   function showPlace(p) {
+    setSheet(false);
     flyTo(p.lat, p.lng, 0.9);
     openCard(`
       <h3><span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}</h3>
@@ -423,6 +465,7 @@
   }
 
   function showCountry(props) {
+    setSheet(false);
     const set = countryWho.get(props.code);
     const f = countryFeatures.find(f => f.properties.code === props.code);
     if (f) { const c = centroid(f); flyTo(c.lat, c.lng, 1.6); }
@@ -540,7 +583,7 @@
     globe.controls().autoRotate = false;
   }
   card.addEventListener("click", e => {
-    if (e.target.closest(".close")) return card.classList.remove("open");
+    if (e.target.closest(".close")) { card.classList.remove("open"); return setSheet(true); }
     const item = e.target.closest(".item[data-p]");
     if (item) return showPlace(places[+item.dataset.p]);
     const all = e.target.closest("[data-gallery]");
