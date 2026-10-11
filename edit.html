@@ -144,6 +144,8 @@
     background: rgba(5, 7, 15, 0.55);
   }
   body.locked .login { display: flex; }
+  /* until we know whether a login is needed, show the globe only (no flash of the form) */
+  body.booting .login-card { visibility: hidden; }
   body.locked .panel, body.locked .banner { display: none; }
   .login-card {
     width: min(420px, 100%); background: var(--panel); border: 1px solid var(--border);
@@ -177,7 +179,7 @@
   }
 </style>
 </head>
-<body class="locked">
+<body class="locked booting">
 <div id="globe"></div>
 <div class="banner" id="banner"><span id="bannerText"></span><button id="bannerCancel">ביטול</button></div>
 <div class="toast" id="toast"></div>
@@ -293,6 +295,14 @@
     return m && repo ? { owner: m[1], repo } : { owner: "galijohn", repo: "Travel-in-the-world" };
   };
   const settings = Object.assign({ token: "", branch: "", ...guessRepo() }, readLS("travelEditor") || {});
+  // A login lasts for this browser session only. Before a password exists the token is
+  // also remembered on the device, so the owner is never locked out before setting one.
+  try { settings.token = sessionStorage.getItem("travelToken") || settings.token; } catch {}
+  function saveSettings() {
+    const { token, ...rest } = settings;
+    writeLS("travelEditor", auth ? rest : settings);
+    try { token ? sessionStorage.setItem("travelToken", token) : sessionStorage.removeItem("travelToken"); } catch {}
+  }
   function readLS(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
   function writeLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
@@ -803,16 +813,19 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     repo: form.repo.value.trim(),
     branch: form.branch.value.trim(),
   });
-  form.addEventListener("input", () => writeLS("travelEditor", { ...settings, ...formSettings() }));
+  form.addEventListener("input", () => {
+    const { token, ...rest } = settings;
+    writeLS("travelEditor", { ...(auth ? rest : settings), ...formSettings() });
+  });
 
   dlg.addEventListener("close", async () => {
     if (dlg.returnValue === "cancel") {
-      writeLS("travelEditor", settings);  // undo what was typed
+      saveSettings();  // undo what was typed
       return;
     }
     const before = appliedConn;
     Object.assign(settings, formSettings());
-    writeLS("travelEditor", settings);
+    saveSettings();
     renderStatus();
     if (before !== connKey() && settings.token) {
       // keep unsaved edits; otherwise pull the latest version from GitHub
@@ -851,7 +864,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   }
   document.getElementById("logoutBtn").onclick = () => {
     if (dirty && !confirm("יש שינויים שלא נשמרו. להתנתק בכל זאת?")) return;
-    settings.token = ""; writeLS("travelEditor", settings);
+    settings.token = ""; saveSettings();
     dirty = false; selected = null;
     dlg.close("cancel"); showLogin("");
   };
@@ -909,7 +922,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
         settings.token = loginForm.token.value.trim();
         if (!settings.token) { err.textContent = "צריך להדביק מפתח."; return; }
       }
-      writeLS("travelEditor", settings);
+      saveSettings();
       await load();
       if (loadError) showLogin(loadError);
       else document.body.classList.remove("locked");
@@ -934,6 +947,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
       const content = b64encodeText(JSON.stringify(next, null, 2) + "\n");
       await putFile(AUTH_PATH, content, "Update editor password", await currentSha(AUTH_PATH));
       auth = next;
+      saveSettings();  // the token now lives only in this session; the password unlocks it next time
       form.new_pw.value = form.new_pw2.value = "";
       renderPwState();
       toast("הסיסמה נקבעה ✓ מעכשיו אפשר להיכנס איתה מכל מכשיר");
@@ -960,7 +974,16 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     toastTimer = setTimeout(() => t.classList.remove("show"), isError ? 8000 : 4000);
   }
 
-  await Promise.all([load(), loadAuth()]);
+  await loadAuth();
+  if (auth) {
+    // a password exists: a token remembered on the device no longer counts
+    let session = "";
+    try { session = sessionStorage.getItem("travelToken") || ""; } catch {}
+    settings.token = session;
+    saveSettings();
+  }
+  await load();
+  document.body.classList.remove("booting");
   if (settings.token && !loadError) document.body.classList.remove("locked");
   else showLogin(settings.token ? loadError : "");
 })();
