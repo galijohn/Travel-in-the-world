@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>עריכת המפה</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✏️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05070f;
+    --panel: rgba(14, 18, 34, 0.92);
+    --field: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #eef1ff;
+    --muted: #9aa3c7;
+    --accent: #ffd166;
+    --danger: #ff6b6b;
+    --ok: #5ee6a8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: "Rubik", system-ui, sans-serif; font-size: 14px; }
+  #globe { position: fixed; inset: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+
+  .panel {
+    position: fixed; top: 12px; right: 12px; bottom: 12px;
+    width: 380px;
+    display: flex; flex-direction: column;
+    background: var(--panel);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border); border-radius: 18px;
+    overflow: hidden; z-index: 2;
+  }
+  .topbar { display: flex; align-items: center; gap: 8px; padding: 14px 14px 10px; }
+  .topbar h1 { font-size: 18px; margin: 0; flex: 1; }
+  .status { font-size: 12px; color: var(--muted); padding: 0 14px 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .status .pill { padding: 2px 8px; border-radius: 999px; background: var(--field); }
+  .status .pill.ok { color: var(--ok); }
+  .status .pill.warn { color: var(--accent); }
+  .status a { color: var(--muted); }
+
+  .btn {
+    border: 1px solid var(--border); background: var(--field);
+    border-radius: 10px; padding: 7px 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn:hover { background: rgba(255,255,255,0.12); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); color: #1b1400; border-color: transparent; font-weight: 500; }
+  .btn.danger { color: var(--danger); }
+  .btn.icon { padding: 7px 9px; }
+
+  .tabs { display: flex; gap: 4px; padding: 0 14px; border-bottom: 1px solid var(--border); }
+  .tabs button {
+    background: none; border: 0; padding: 9px 10px; cursor: pointer;
+    color: var(--muted); border-bottom: 2px solid transparent;
+  }
+  .tabs button[aria-selected="true"] { color: var(--text); border-color: var(--accent); }
+
+  .body { flex: 1; overflow-y: auto; padding: 12px 14px 16px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > * { flex: 1; }
+  .stack > * + * { margin-top: 10px; }
+
+  input[type=text], input[type=url], input[type=password], input[type=number], input[type=month], select, textarea {
+    width: 100%; background: var(--field); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 10px; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: rgba(255,255,255,0.4); }
+  select option { background: #141a30; }
+  textarea { resize: vertical; min-height: 64px; }
+  label.f { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+  .results { margin-top: 6px; }
+  .item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    text-align: right; background: none; border: 0; border-radius: 10px;
+    padding: 8px; cursor: pointer;
+  }
+  .item:hover, .item.sel { background: rgba(255,255,255,0.08); }
+  .item .meta { color: var(--muted); font-size: 12px; margin-inline-start: auto; white-space: nowrap; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .empty { color: var(--muted); padding: 10px 8px; }
+  h2 { font-size: 12px; color: var(--muted); font-weight: 500; margin: 14px 0 4px; }
+
+  .who-toggle { display: flex; gap: 6px; }
+  .who-toggle button {
+    flex: 1; border: 1px solid var(--border); background: var(--field);
+    border-radius: 10px; padding: 8px 6px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .who-toggle button[aria-pressed="true"] { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.45); }
+  .hint { font-size: 12px; color: var(--muted); }
+
+
+  .banner {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #1b1400; font-weight: 500;
+    padding: 8px 16px; border-radius: 999px; z-index: 5; display: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,.4);
+  }
+  .banner.show { display: flex; gap: 10px; align-items: center; }
+  .banner button { background: rgba(0,0,0,.15); border: 0; border-radius: 999px; padding: 2px 10px; cursor: pointer; color: inherit; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 20px; z-index: 6;
+    background: #141a30; border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 14px; max-width: 360px; display: none;
+  }
+  .toast.show { display: block; }
+  .toast.error { border-color: var(--danger); }
+
+  dialog {
+    background: #11162b; color: var(--text); border: 1px solid var(--border);
+    border-radius: 16px; padding: 18px; width: min(460px, calc(100% - 32px));
+  }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h3 { margin: 0 0 10px; }
+  dialog ol { padding-inline-start: 18px; margin: 6px 0; color: var(--muted); line-height: 1.6; }
+  dialog a { color: var(--accent); }
+
+  .tooltip {
+    font-family: "Rubik", system-ui, sans-serif; direction: rtl;
+    background: rgba(10,12,24,0.9); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: 8px; font-size: 13px; color: var(--text);
+  }
+
+  @media (max-width: 700px) {
+    .panel { top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 58%; border-radius: 18px 18px 0 0; }
+    .toast { left: 12px; right: 12px; bottom: auto; top: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="globe"></div>
+<div class="banner" id="banner"><span id="bannerText"></span><button id="bannerCancel">ביטול</button></div>
+<div class="toast" id="toast"></div>
+
+<aside class="panel">
+  <div class="topbar">
+    <h1>✏️ עריכת המפה</h1>
+    <a class="btn icon" href="./" target="_blank" title="לצפייה במפה">👁️</a>
+    <button class="btn icon" id="settingsBtn" title="הגדרות">⚙️</button>
+    <button class="btn primary" id="saveBtn" disabled>שמירה</button>
+  </div>
+  <div class="status" id="status"></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="places" aria-selected="true">מקומות</button>
+    <button role="tab" data-tab="countries" aria-selected="false">מדינות</button>
+  </div>
+  <div class="body" id="body"></div>
+</aside>
+
+<dialog id="settings">
+  <form method="dialog" class="stack" id="settingsForm">
+    <h3>⚙️ הגדרות</h3>
+    <div>
+      <label class="f">מפתח גישה ל-GitHub (token)</label>
+      <input type="password" name="token" autocomplete="off" placeholder="github_pat_...">
+      <details class="hint" style="margin-top:6px">
+        <summary>איך יוצרים מפתח?</summary>
+        <ol>
+          <li>נכנסים ל-<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">יצירת Fine-grained token</a></li>
+          <li>שם: travel-map. תוקף: כמה שרוצים</li>
+          <li>Repository access ← <b>Only select repositories</b> ← בוחרים את Travel-in-the-world</li>
+          <li>Permissions ← Repository permissions ← <b>Contents: Read and write</b></li>
+          <li>Generate token, מעתיקים ומדביקים כאן</li>
+        </ol>
+        המפתח נשמר רק בדפדפן הזה ולא נשלח לשום מקום חוץ מ-GitHub.
+      </details>
+    </div>
+    <div class="row">
+      <div><label class="f">משתמש</label><input type="text" name="owner" dir="ltr"></div>
+      <div><label class="f">ריפו</label><input type="text" name="repo" dir="ltr"></div>
+      <div><label class="f">ענף</label><input type="text" name="branch" dir="ltr"></div>
+    </div>
+    <h2>שמות במפה</h2>
+    <div class="row">
+      <div><label class="f">אני</label><input type="text" name="name_me"></div>
+      <div><label class="f">בת הזוג</label><input type="text" name="name_partner"></div>
+      <div><label class="f">יחד</label><input type="text" name="name_together"></div>
+    </div>
+    <div class="row" style="justify-content:flex-start">
+      <button class="btn primary" value="save" style="flex:none">שמירת הגדרות</button>
+      <button class="btn" value="cancel" formnovalidate style="flex:none">ביטול</button>
+      <span style="flex:1"></span>
+      <button class="btn danger" type="button" id="logoutBtn" style="flex:none">התנתקות</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
+<script src="assets/common.js"></script>
+<script>
+(async () => {
+  const { asList, category, aggregateCountries, countryName, centroid, hexA, esc } = TravelCommon;
+  const DATA_PATH = "data/places.js";
+  const WHO_KEYS = ["together", "me", "partner"];
+
+  // --- settings (kept in this browser only) --------------------------------
+  const guessRepo = () => {
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    const repo = location.pathname.split("/").filter(Boolean)[0];
+    return m && repo ? { owner: m[1], repo } : { owner: "galijohn", repo: "Travel-in-the-world" };
+  };
+  const settings = Object.assign({ token: "", branch: "main", ...guessRepo() }, readLS("travelEditor") || {});
+  function readLS(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+  function writeLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+  // --- state ---------------------------------------------------------------
+  let data = null;            // { people, countries, places }
+  let fileSha = null;         // sha of data/places.js on GitHub (null = not loaded from API / new file)
+  let loadError = false;
+  let dirty = false;
+  let tab = "places";
+  let selected = null;        // place object or country object being edited
+  let pickMode = null;        // null | "new" | "move"
+  let searchResults = [];
+
+  const countryFeatures = await TravelCommon.loadCountries();
+  const featureByCode = new Map(countryFeatures.map(f => [f.properties.code, f]));
+  const codeByIso2 = new Map(countryFeatures.map(f => [f.properties.iso2.toLowerCase(), f.properties.code]));
+  const countryProps = code => featureByCode.get(code)?.properties || { code, iso2: "", name: code };
+  const allCountriesSorted = countryFeatures.map(f => f.properties)
+    .sort((a, b) => countryName(a).localeCompare(countryName(b), "he"));
+
+  const P = () => data.people;
+  const catInfo = c => TravelCommon.catInfo(P(), c);
+  const catOf = obj => category(new Set(asList(obj.who)));
+
+  // --- globe ---------------------------------------------------------------
+  const el = document.getElementById("globe");
+  const globe = Globe()(el)
+    .globeImageUrl("assets/earth.jpg")
+    .backgroundImageUrl("assets/night-sky.png")
+    .atmosphereColor("#7aa2ff")
+    .atmosphereAltitude(0.18)
+    .polygonsData(countryFeatures)
+    .polygonSideColor(() => "rgba(0,0,0,0.15)")
+    .polygonStrokeColor(() => "rgba(255,255,255,0.25)")
+    .polygonsTransitionDuration(0)
+    .polygonLabel(f => `<div class="tooltip">${esc(countryName(f.properties))}</div>`)
+    .onPolygonClick((f, ev, coords) => onGlobeClick(coords, f))
+    .onGlobeClick(coords => onGlobeClick(coords, null))
+    .pointLat("lat").pointLng("lng")
+    .pointAltitude(p => p === selected ? 0.06 : 0.02)
+    .pointRadius(p => p === selected ? 0.7 : 0.45)
+    .pointColor(p => p === selected ? "#ffffff" : catInfo(catOf(p)).color)
+    .pointLabel(p => `<div class="tooltip"><b>${esc(p.name || "מקום חדש")}</b></div>`)
+    .onPointClick(p => { if (!pickMode) selectPlace(p, true); });
+  globe.pointOfView({ lat: 32, lng: 35, altitude: 2.3 });
+  const onResize = () => globe.width(innerWidth).height(innerHeight);
+  addEventListener("resize", onResize);
+  onResize();
+
+  function renderGlobe() {
+    const agg = aggregateCountries(data);
+    globe
+      .polygonCapColor(f => {
+        const code = f.properties.code;
+        if (tab === "countries" && selected && selected.code === code && !("lat" in selected)) return "rgba(255,255,255,0.6)";
+        const set = agg.get(code);
+        return set && set.size ? hexA(catInfo(category(set)).color, 0.55) : "rgba(0,0,0,0)";
+      })
+      .polygonAltitude(f => agg.has(f.properties.code) ? 0.012 : 0.004)
+      .pointsData(data.places.filter(p => p.lat != null));
+  }
+
+  function flyTo(lat, lng, altitude) { globe.pointOfView({ lat, lng, altitude }, 1000); }
+
+  // --- loading -------------------------------------------------------------
+  async function load() {
+    if (settings.token) {
+      try {
+        const r = await gh(`contents/${DATA_PATH}?ref=${encodeURIComponent(settings.branch)}`);
+        if (r.status === 404) {
+          // file not on this branch yet: start from what the site serves, create on save
+          data = normalize(await TravelCommon.loadSiteData());
+          fileSha = null;
+        } else {
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.message || r.status);
+          data = normalize(parseDataFile(b64decode(j.content)));
+          fileSha = j.sha;
+        }
+        loadError = false;
+      } catch (e) {
+        toast("לא הצלחתי לטעון מ-GitHub: " + e.message, true);
+        data = normalize(await TravelCommon.loadSiteData());
+        fileSha = null;
+        loadError = true;
+      }
+    } else {
+      data = normalize(await TravelCommon.loadSiteData());
+    }
+    dirty = false; selected = null;
+    renderAll();
+  }
+
+  function normalize(d) {
+    d = JSON.parse(JSON.stringify(d || {}));
+    d.people = Object.assign({
+      me: { name: "אני", color: "#4cc9f0" },
+      partner: { name: "זוגתי", color: "#f72585" },
+      together: { name: "יחד", color: "#ffd166" },
+    }, d.people || {});
+    d.countries = d.countries || [];
+    d.places = d.places || [];
+    return d;
+  }
+
+  // data/places.js is a small JS file that sets window.TRAVEL; run it against a stub window
+  function parseDataFile(text) {
+    const win = {};
+    new Function("window", text)(win);
+    return win.TRAVEL;
+  }
+
+  function serialize() {
+    const clean = obj => {
+      const o = {};
+      for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith("__") || v === "" || v == null || (Array.isArray(v) && !v.length)) continue;
+        o[k] = v;
+      }
+      return o;
+    };
+    const out = {
+      people: data.people,
+      countries: data.countries.map(clean),
+      places: data.places.map(clean),
+    };
+    return `// =====================================================================
+//  נתוני המפה. אפשר לערוך דרך edit.html, או ידנית כאן.
+//
+//  who: "together" (יחד) | "me" (אני) | "partner" (בת הזוג)
+//       או רשימה, למשל ["me", "partner"] = כל אחד היה שם בנפרד
+//  code: קוד מדינה בן 3 אותיות (ISR, ITA, FRA ...)
+// =====================================================================
+
+window.TRAVEL = ${JSON.stringify(out, null, 2)};
+`;
+  }
+
+  // --- GitHub API ----------------------------------------------------------
+  function gh(path, opts = {}) {
+    return fetch(`https://api.github.com/repos/${settings.owner}/${settings.repo}/${path}`, {
+      ...opts,
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${settings.token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...(opts.headers || {}),
+      },
+    });
+  }
+
+  async function putFile(path, base64, message, sha) {
+    const body = { message, content: base64, branch: settings.branch };
+    if (sha) body.sha = sha;
+    const r = await gh(`contents/${path}`, { method: "PUT", body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) { const e = new Error(j.message || r.status); e.status = r.status; throw e; }
+    return j.content.sha;
+  }
+
+  async function currentSha(path) {
+    const r = await gh(`contents/${path}?ref=${encodeURIComponent(settings.branch)}`);
+    if (r.status === 404) return null;
+    const j = await r.json();
+    return j.sha;
+  }
+
+  const b64encodeText = s => bytesToB64(new TextEncoder().encode(s));
+  const b64decode = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, "")), c => c.charCodeAt(0)));
+  function bytesToB64(bytes) {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
+  async function save() {
+    if (!settings.token) return openSettings();
+    const btn = document.getElementById("saveBtn");
+    btn.disabled = true;
+    try {
+      btn.textContent = "שומר...";
+      const content = b64encodeText(serialize());
+      try {
+        fileSha = await putFile(DATA_PATH, content, "Update travel map", fileSha);
+      } catch (e) {
+        // file changed on GitHub since we loaded it (e.g. edited from the phone): this editor wins
+        if (e.status !== 409 && e.status !== 422) throw e;
+        fileSha = await putFile(DATA_PATH, content, "Update travel map", await currentSha(DATA_PATH));
+      }
+      dirty = false;
+      loadError = false;
+      toast("נשמר ✓ המפה הציבורית תתעדכן בעוד כדקה");
+    } catch (e) {
+      toast("השמירה נכשלה: " + e.message + (e.status === 401 || e.status === 403 || e.status === 404 ? " (בדוק את המפתח וההרשאות בהגדרות)" : ""), true);
+    } finally {
+      btn.textContent = "שמירה";
+      renderStatus();
+    }
+  }
+
+  // --- geocoding (OpenStreetMap Nominatim) ---------------------------------
+  async function geocode(q) {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&accept-language=he&q=${encodeURIComponent(q)}`);
+    return (await r.json()).map(x => ({
+      name: x.name || x.display_name.split(",")[0],
+      label: x.display_name,
+      lat: +(+x.lat).toFixed(4), lng: +(+x.lon).toFixed(4),
+      code: codeByIso2.get(x.address?.country_code || "") || "",
+    }));
+  }
+  async function reverseGeocode(lat, lng) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=he&lat=${lat}&lon=${lng}`);
+      const x = await r.json();
+      const a = x.address || {};
+      return {
+        name: a.city || a.town || a.village || a.county || a.state || x.name || "",
+        code: codeByIso2.get(a.country_code || "") || "",
+      };
+    } catch { return { name: "", code: "" }; }
+  }
+
+  // --- interactions --------------------------------------------------------
+  async function onGlobeClick(coords, feature) {
+    if (!coords) return;
+    const lat = +coords.lat.toFixed(4), lng = +coords.lng.toFixed(4);
+    if (pickMode === "move" && selected) {
+      selected.lat = lat; selected.lng = lng;
+      if (feature) selected.code = feature.properties.code;
+      setPick(null); markDirty(); renderAll();
+      return;
+    }
+    if (pickMode === "new") {
+      setPick(null);
+      const place = { name: "", code: feature?.properties.code || "", lat, lng, who: "together" };
+      data.places.push(place);
+      markDirty();
+      selectPlace(place, false);
+      const g = await reverseGeocode(lat, lng);
+      if (!place.name && g.name) place.name = g.name;
+      if (!place.code && g.code) place.code = g.code;
+      if (selected === place) renderBody();
+      return;
+    }
+    if (tab === "countries" && feature) selectCountry(feature.properties.code, true);
+  }
+
+  function setPick(mode) {
+    pickMode = mode;
+    const b = document.getElementById("banner");
+    b.classList.toggle("show", !!mode);
+    document.getElementById("bannerText").textContent =
+      mode === "new" ? "לחץ על הגלובוס במקום שהייתם בו" : "לחץ על הגלובוס במיקום החדש";
+  }
+  document.getElementById("bannerCancel").onclick = () => setPick(null);
+
+  function selectPlace(p, fly) {
+    tab = "places"; selected = p;
+    if (fly && p.lat != null) flyTo(p.lat, p.lng, 0.9);
+    renderAll();
+  }
+
+  function selectCountry(code, fly) {
+    tab = "countries";
+    let c = data.countries.find(x => x.code === code);
+    if (!c) {
+      // implicit (from places) or brand new: add an explicit entry
+      const inherited = aggregateCountries(data).get(code);
+      c = { code, who: inherited ? collapseWho([...inherited]) : "together" };
+      data.countries.push(c);
+      markDirty();
+    }
+    selected = c;
+    const f = featureByCode.get(code);
+    if (fly && f) { const ctr = centroid(f); flyTo(ctr.lat, ctr.lng, 1.6); }
+    renderAll();
+  }
+
+  const collapseWho = list => list.includes("together") ? "together" : (list.length === 1 ? list[0] : list);
+
+  function markDirty() { dirty = true; renderStatus(); }
+
+  // --- rendering -----------------------------------------------------------
+  function renderAll() { renderTabs(); renderStatus(); renderBody(); renderGlobe(); }
+
+  function renderTabs() {
+    document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  }
+  document.querySelector(".tabs").addEventListener("click", e => {
+    const b = e.target.closest("button[data-tab]"); if (!b) return;
+    tab = b.dataset.tab; selected = null; setPick(null); renderAll();
+  });
+
+  function renderStatus() {
+    const s = document.getElementById("status");
+    const conn = settings.token
+      ? (!loadError ? `<span class="pill ok">מחובר ל-GitHub · ${esc(settings.branch)}</span>` : `<span class="pill warn">שגיאת חיבור</span>`)
+      : `<span class="pill warn">לא מחובר · אפשר לערוך אבל לא לשמור</span> <a href="#" id="connectLink">התחברות</a>`;
+    s.innerHTML = conn + (dirty ? `<span class="pill warn">יש שינויים שלא נשמרו</span>` : "");
+    document.getElementById("connectLink")?.addEventListener("click", e => { e.preventDefault(); openSettings(); });
+    document.getElementById("saveBtn").disabled = !dirty;
+  }
+
+  const body = document.getElementById("body");
+
+  function renderBody() {
+    if (tab === "places") selected ? renderPlaceForm(selected) : renderPlaceList();
+    else selected ? renderCountryForm(selected) : renderCountryList();
+  }
+
+  function whoDot(obj) { return `<span class="dot" style="background:${catInfo(catOf(obj)).color}"></span>`; }
+
+  function renderPlaceList() {
+    const list = [...data.places].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    body.innerHTML = `
+      <div class="stack">
+        <div class="row">
+          <input type="text" id="search" placeholder="🔍 חיפוש עיר או מקום להוספה..." style="flex:3">
+          <button class="btn" id="pickNew" style="flex:none" title="בחירה על הגלובוס">📍 על המפה</button>
+        </div>
+        <div class="results" id="results"></div>
+      </div>
+      <h2>המקומות שלנו (${list.length})</h2>
+      ${list.length ? list.map(p => `<button class="item" data-i="${data.places.indexOf(p)}">${whoDot(p)}${esc(p.name || "ללא שם")}
+        <span class="meta">${esc(p.date || "")}${p.album ? " · 📷" : ""}</span></button>`).join("")
+        : `<div class="empty">עוד אין מקומות. חפשו עיר למעלה או לחצו "על המפה".</div>`}`;
+
+    const search = document.getElementById("search");
+    let timer;
+    search.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = search.value.trim();
+      if (q.length < 2) { document.getElementById("results").innerHTML = ""; return; }
+      timer = setTimeout(async () => {
+        try { searchResults = await geocode(q); } catch { searchResults = []; }
+        if (search.value.trim() !== q) return;
+        document.getElementById("results").innerHTML = searchResults.length
+          ? searchResults.map((r, i) => `<button class="item" data-r="${i}">➕ <span><b>${esc(r.name)}</b><br><span class="hint">${esc(r.label)}</span></span></button>`).join("")
+          : `<div class="empty">לא נמצא</div>`;
+      }, 400);
+    });
+    document.getElementById("pickNew").onclick = () => setPick("new");
+    body.querySelectorAll(".item[data-i]").forEach(b => b.onclick = () => selectPlace(data.places[+b.dataset.i], true));
+    body.querySelector("#results").addEventListener("click", e => {
+      const b = e.target.closest(".item[data-r]"); if (!b) return;
+      const r = searchResults[+b.dataset.r];
+      const place = { name: r.name, code: r.code, lat: r.lat, lng: r.lng, who: "together" };
+      data.places.push(place);
+      markDirty();
+      selectPlace(place, true);
+    });
+  }
+
+  function whoToggleHtml(obj) {
+    const set = new Set(asList(obj.who));
+    return `<div class="who-toggle" id="who">${WHO_KEYS.map(k =>
+      `<button type="button" data-w="${k}" aria-pressed="${set.has(k)}"><span class="dot" style="background:${P()[k].color}"></span>${esc(P()[k].name)}</button>`).join("")}</div>
+      <div class="hint" style="margin-top:4px">לבחור "${esc(P().me.name)}" וגם "${esc(P().partner.name)}" = כל אחד היה שם בנפרד</div>`;
+  }
+
+  function bindWhoToggle(obj, after) {
+    document.getElementById("who").addEventListener("click", e => {
+      const b = e.target.closest("button[data-w]"); if (!b) return;
+      const k = b.dataset.w;
+      let set = new Set(asList(obj.who));
+      if (k === "together") set = new Set(["together"]);
+      else {
+        set.delete("together");
+        set.has(k) ? set.delete(k) : set.add(k);
+        if (!set.size) set.add("together");
+      }
+      obj.who = collapseWho([...set]);
+      markDirty(); after();
+    });
+  }
+
+  function countryOptions(selectedCode) {
+    return `<option value="">— בחירה —</option>` + allCountriesSorted.map(p =>
+      `<option value="${p.code}" ${p.code === selectedCode ? "selected" : ""}>${esc(countryName(p))}</option>`).join("");
+  }
+
+  function renderPlaceForm(p) {
+    body.innerHTML = `
+      <div class="stack">
+        <button class="btn" id="back">→ חזרה לרשימה</button>
+        <div><label class="f">שם המקום</label><input type="text" data-k="name" value="${esc(p.name)}" placeholder="למשל: רומא"></div>
+        <div><label class="f">מי היה שם</label>${whoToggleHtml(p)}</div>
+        <div class="row">
+          <div><label class="f">מתי</label><input type="month" data-k="date" value="${esc(p.date)}"></div>
+          <div><label class="f">מדינה</label><select data-k="code">${countryOptions(p.code)}</select></div>
+        </div>
+        <div><label class="f">כמה מילים</label><textarea data-k="note" placeholder="מה זוכרים מפה?">${esc(p.note)}</textarea></div>
+        <div><label class="f">קישור לתיקיית התמונות בגוגל דרייב</label><input type="url" data-k="album" dir="ltr" value="${esc(p.album)}" placeholder="https://drive.google.com/drive/folders/..."><div class="hint" style="margin-top:4px">בדרייב: שיתוף ← "כל מי שיש לו את הקישור" ← העתקת קישור</div></div>
+        <div class="row">
+          <div><label class="f">קו רוחב</label><input type="number" step="0.0001" data-k="lat" value="${p.lat ?? ""}" dir="ltr"></div>
+          <div><label class="f">קו אורך</label><input type="number" step="0.0001" data-k="lng" value="${p.lng ?? ""}" dir="ltr"></div>
+          <button class="btn" id="move" style="flex:none;align-self:flex-end" title="בחירת מיקום על הגלובוס">📍</button>
+        </div>
+        <div class="row" style="padding-top:6px">
+          <button class="btn danger" id="del" style="flex:none">🗑️ מחיקת המקום</button>
+        </div>
+      </div>`;
+    bindFields(p, () => renderGlobe());
+    bindWhoToggle(p, () => { renderPlaceForm(p); renderGlobe(); });
+    document.getElementById("back").onclick = () => { selected = null; setPick(null); renderAll(); };
+    document.getElementById("move").onclick = () => setPick("move");
+    document.getElementById("del").onclick = () => {
+      if (!confirm(`למחוק את "${p.name || "המקום"}"?`)) return;
+      data.places.splice(data.places.indexOf(p), 1);
+      selected = null; markDirty(); renderAll();
+    };
+  }
+
+  function bindFields(obj, after) {
+    body.querySelectorAll("[data-k]").forEach(inp => {
+      inp.addEventListener("input", () => {
+        const k = inp.dataset.k;
+        obj[k] = inp.type === "number" ? (inp.value === "" ? null : +inp.value) : inp.value.trim();
+        markDirty(); after();
+      });
+    });
+  }
+
+  function renderCountryList() {
+    const agg = aggregateCountries(data);
+    const rows = [...agg.entries()]
+      .map(([code, set]) => ({ code, set, props: countryProps(code), explicit: data.countries.some(c => c.code === code) }))
+      .sort((a, b) => countryName(a.props).localeCompare(countryName(b.props), "he"));
+    body.innerHTML = `
+      <div class="stack">
+        <select id="addCountry">${countryOptions("").replace("— בחירה —", "➕ הוספת מדינה...")}</select>
+        <div class="hint">אפשר גם ללחוץ על מדינה בגלובוס. מדינות של מקומות נצבעות אוטומטית.</div>
+      </div>
+      <h2>מדינות (${rows.length})</h2>
+      ${rows.map(r => `<button class="item" data-c="${r.code}"><span class="dot" style="background:${catInfo(category(r.set)).color}"></span>${esc(countryName(r.props))}
+        <span class="meta">${esc(catInfo(category(r.set)).name)}${r.explicit ? "" : " · מהמקומות"}</span></button>`).join("")}`;
+    document.getElementById("addCountry").onchange = e => { if (e.target.value) selectCountry(e.target.value, true); };
+    body.querySelectorAll(".item[data-c]").forEach(b => b.onclick = () => selectCountry(b.dataset.c, true));
+  }
+
+  function renderCountryForm(c) {
+    const inside = data.places.filter(p => p.code === c.code);
+    body.innerHTML = `
+      <div class="stack">
+        <button class="btn" id="back">→ חזרה לרשימה</button>
+        <h3 style="margin:4px 0 0;font-size:20px">${esc(countryName(countryProps(c.code)))}</h3>
+        <div><label class="f">מי היה שם</label>${whoToggleHtml(c)}</div>
+        <div><label class="f">כמה מילים</label><textarea data-k="note">${esc(c.note)}</textarea></div>
+        <div><label class="f">קישור לתיקיית התמונות בגוגל דרייב</label><input type="url" data-k="album" dir="ltr" value="${esc(c.album)}" placeholder="https://drive.google.com/drive/folders/..."><div class="hint" style="margin-top:4px">בדרייב: שיתוף ← "כל מי שיש לו את הקישור" ← העתקת קישור</div></div>
+        ${inside.length ? `<div><label class="f">מקומות במדינה</label>${inside.map(p =>
+          `<button class="item" data-i="${data.places.indexOf(p)}">${whoDot(p)}${esc(p.name || "ללא שם")}<span class="meta">${esc(p.date || "")}</span></button>`).join("")}
+          <div class="hint">המדינה תישאר צבועה כל עוד יש בה מקומות.</div></div>` : ""}
+        <div class="row" style="padding-top:6px">
+          <button class="btn danger" id="del" style="flex:none">🗑️ הסרת המדינה</button>
+        </div>
+      </div>`;
+    bindFields(c, () => {});
+    bindWhoToggle(c, () => { renderCountryForm(c); renderGlobe(); });
+    body.querySelectorAll(".item[data-i]").forEach(b => b.onclick = () => selectPlace(data.places[+b.dataset.i], true));
+    document.getElementById("back").onclick = () => { selected = null; renderAll(); };
+    document.getElementById("del").onclick = () => {
+      data.countries.splice(data.countries.indexOf(c), 1);
+      selected = null; markDirty(); renderAll();
+    };
+  }
+
+  // --- settings dialog -----------------------------------------------------
+  const dlg = document.getElementById("settings");
+  const form = document.getElementById("settingsForm");
+  function openSettings() {
+    form.token.value = settings.token;
+    form.owner.value = settings.owner;
+    form.repo.value = settings.repo;
+    form.branch.value = settings.branch;
+    form.name_me.value = data.people.me.name;
+    form.name_partner.value = data.people.partner.name;
+    form.name_together.value = data.people.together.name;
+    dlg.showModal();
+  }
+  document.getElementById("settingsBtn").onclick = openSettings;
+  dlg.addEventListener("close", async () => {
+    if (dlg.returnValue !== "save") return;
+    const before = JSON.stringify([settings.token, settings.owner, settings.repo, settings.branch]);
+    Object.assign(settings, {
+      token: form.token.value.trim(),
+      owner: form.owner.value.trim(),
+      repo: form.repo.value.trim(),
+      branch: form.branch.value.trim() || "main",
+    });
+    writeLS("travelEditor", settings);
+    if (before !== JSON.stringify([settings.token, settings.owner, settings.repo, settings.branch]) && settings.token) {
+      // keep unsaved edits; otherwise pull the latest version from GitHub
+      if (dirty) fileSha = null;
+      else await load();
+    }
+    for (const k of WHO_KEYS) {
+      const v = form["name_" + k].value.trim();
+      if (v && v !== data.people[k].name) { data.people[k].name = v; markDirty(); }
+    }
+    renderAll();
+  });
+  document.getElementById("logoutBtn").onclick = () => {
+    settings.token = ""; writeLS("travelEditor", settings);
+    dlg.close(); renderAll();
+  };
+
+  document.getElementById("saveBtn").onclick = save;
+  addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); if (dirty) save(); }
+    if (e.key === "Escape") setPick(null);
+  });
+  addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+  let toastTimer;
+  function toast(msg, isError) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show" + (isError ? " error" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), isError ? 8000 : 4000);
+  }
+
+  await load();
+  if (!settings.token) openSettings();
+})();
+</script>
+</body>
+</html>

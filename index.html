@@ -115,6 +115,10 @@
   }
   .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
   .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: zoom-in; }
+  .drive {
+    display: block; width: 100%; height: 260px; margin-top: 12px;
+    border: 0; border-radius: 10px; background: #fff;
+  }
   .album {
     display: inline-block; margin-top: 12px;
     color: var(--bg); background: var(--together);
@@ -181,35 +185,16 @@
 <div class="lightbox" id="lightbox"><img alt=""></div>
 
 <script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
-<script src="data/places.js"></script>
+<script src="assets/common.js"></script>
 <script>
-(() => {
-  const T = window.TRAVEL;
+(async () => {
+  const { asList, category, aggregateCountries, countryName, centroid, hexA, esc } = TravelCommon;
+  const [T, countryFeatures] = await Promise.all([TravelCommon.loadSiteData(), TravelCommon.loadCountries()]);
   const P = T.people;
-  const SEPARATE = { name: "כל אחד בנפרד", color: "#b388ff" };
-  const regionNames = (() => { try { return new Intl.DisplayNames(["he"], { type: "region" }); } catch { return null; } })();
+  const catInfo = c => TravelCommon.catInfo(P, c);
+  const whoLabel = who => TravelCommon.whoLabel(P, who);
 
-  const asList = w => Array.isArray(w) ? w : [w];
-  // the "strongest" category: together > each separately > one of us
-  const category = whoSet => {
-    if (whoSet.has("together")) return "together";
-    if (whoSet.has("me") && whoSet.has("partner")) return "separate";
-    if (whoSet.has("me")) return "me";
-    return "partner";
-  };
-  const catInfo = c => c === "separate" ? SEPARATE : P[c];
-  const whoLabel = who => asList(who).map(w => P[w].name).join(" + ");
-
-  // --- aggregate countries -------------------------------------------------
-  const countryWho = new Map(); // code -> Set(who)
-  const addWho = (code, who) => {
-    if (!code) return;
-    if (!countryWho.has(code)) countryWho.set(code, new Set());
-    asList(who).forEach(w => countryWho.get(code).add(w));
-  };
-  T.countries.forEach(c => addWho(c.code, c.who));
-  T.places.forEach(p => addWho(p.code, p.who));
-
+  const countryWho = aggregateCountries(T);
   const places = T.places.map(p => ({ ...p, cat: category(new Set(asList(p.who))) }));
 
   // --- UI state ------------------------------------------------------------
@@ -233,15 +218,13 @@
     .polygonStrokeColor(() => "rgba(255,255,255,0.25)")
     .polygonsTransitionDuration(400)
     .polygonLabel(f => {
-      const code = f.properties.code;
-      const set = countryWho.get(code);
+      const set = countryWho.get(f.properties.code);
       const name = countryName(f.properties);
       if (!set) return `<div class="tooltip">${esc(name)}</div>`;
       return `<div class="tooltip"><b>${esc(name)}</b><br>${esc(catInfo(category(set)).name)}</div>`;
     })
     .onPolygonClick(f => {
-      const set = countryWho.get(f.properties.code);
-      if (set) showCountry(f.properties);
+      if (countryWho.has(f.properties.code)) showCountry(f.properties);
     })
     .pointLat("lat").pointLng("lng")
     .pointAltitude(0.02)
@@ -263,12 +246,6 @@
   const onResize = () => globe.width(innerWidth).height(innerHeight);
   addEventListener("resize", onResize);
   onResize();
-
-  let countryFeatures = [];
-  fetch("data/countries.geojson").then(r => r.json()).then(geo => {
-    countryFeatures = geo.features.filter(f => f.properties.code !== "ATA");
-    render();
-  });
 
   function polyColor(f) {
     const set = countryWho.get(f.properties.code);
@@ -330,7 +307,7 @@
 
     listEl.innerHTML =
       `<h2>מקומות (${visPlaces.length})</h2>` +
-      visPlaces.map((p, i) => `<button class="item" data-p="${places.indexOf(p)}">
+      visPlaces.map(p => `<button class="item" data-p="${places.indexOf(p)}">
           <span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}
           <span class="meta">${esc(p.date || "")}</span></button>`).join("") +
       `<h2>מדינות (${visCountries.length})</h2>` +
@@ -359,22 +336,32 @@
       <div class="who">${esc(whoLabel(p.who))}${p.date ? " · " + esc(p.date) : ""}${p.code ? " · " + esc(countryName(countryProps(p.code))) : ""}</div>
       ${p.note ? `<p>${esc(p.note)}</p>` : ""}
       ${photos ? `<div class="photos">${photos}</div>` : ""}
-      ${p.album ? `<a class="album" href="${esc(p.album)}" target="_blank" rel="noopener">📷 לאלבום התמונות</a>` : ""}`);
+      ${albumHtml(p.album)}`);
   }
 
   function showCountry(props) {
     const set = countryWho.get(props.code);
-    const c = countryCentroid(props.code);
-    if (c) flyTo(c.lat, c.lng, 1.6);
+    const f = countryFeatures.find(f => f.properties.code === props.code);
+    if (f) { const c = centroid(f); flyTo(c.lat, c.lng, 1.6); }
     const inside = places.filter(p => p.code === props.code);
     const meta = T.countries.find(x => x.code === props.code) || {};
+    const photos = (meta.photos || []).map(src => `<img src="${esc(src)}" loading="lazy" alt="">`).join("");
     openCard(`
       <h3><span class="dot" style="background:${catInfo(category(set)).color}"></span>${esc(countryName(props))}</h3>
       <div class="who">${esc(catInfo(category(set)).name)}</div>
       ${meta.note ? `<p>${esc(meta.note)}</p>` : ""}
       ${inside.length ? `<div class="list" style="border:0;padding:6px 0 0">${inside.map(p =>
         `<button class="item" data-p="${places.indexOf(p)}"><span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}<span class="meta">${esc(p.date || "")}</span></button>`).join("")}</div>` : ""}
-      ${meta.album ? `<a class="album" href="${esc(meta.album)}" target="_blank" rel="noopener">📷 לאלבום התמונות</a>` : ""}`);
+      ${photos ? `<div class="photos">${photos}</div>` : ""}
+      ${albumHtml(meta.album)}`);
+  }
+
+  // a shared Drive folder shows as a thumbnail grid; any other link is just a button
+  function albumHtml(url) {
+    if (!url) return "";
+    const id = TravelCommon.driveFolderId(url);
+    return (id ? `<iframe class="drive" src="https://drive.google.com/embeddedfolderview?id=${esc(id)}#grid" loading="lazy" title="תמונות"></iframe>` : "") +
+      `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לכל התמונות</a>`;
   }
 
   function openCard(html) {
@@ -405,27 +392,8 @@
     const f = countryFeatures.find(f => f.properties.code === code);
     return f ? f.properties : { code, iso2: "", name: code };
   }
-  function countryName(props) {
-    if (regionNames && props.iso2) { try { return regionNames.of(props.iso2); } catch {} }
-    return props.name;
-  }
-  function countryCentroid(code) {
-    const f = countryFeatures.find(f => f.properties.code === code);
-    if (!f) return null;
-    // centroid of the largest ring — good enough to aim the camera
-    const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
-    const ring = polys.map(p => p[0]).sort((a, b) => b.length - a.length)[0];
-    let x = 0, y = 0;
-    ring.forEach(([lng, lat]) => { x += lng; y += lat; });
-    return { lng: x / ring.length, lat: y / ring.length };
-  }
-  function hexA(hex, a) {
-    const n = parseInt(hex.slice(1), 16);
-    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
-  }
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
+
+  render();
 })();
 </script>
 </body>
