@@ -50,14 +50,5 @@ window.TRAVEL = {
       ]
     }
   ],
-  "places": [
-    {
-      "name": "ניו יורק",
-      "code": "USA",
-      "lat": 40.7128,
-      "lng": -74.006,
-      "who": "me",
-      "date": "2017-07"
-    }
-  ]
+  "places": []
 };
