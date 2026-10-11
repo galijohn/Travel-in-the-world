@@ -23,33 +23,6 @@ window.TRAVEL = {
   },
   "countries": [
     {
-      "code": "ISR",
-      "who": "together"
-    },
-    {
-      "code": "ITA",
-      "who": "together"
-    },
-    {
-      "code": "GRC",
-      "who": "together"
-    },
-    {
-      "code": "THA",
-      "who": "me"
-    },
-    {
-      "code": "FRA",
-      "who": "partner"
-    },
-    {
-      "code": "USA",
-      "who": [
-        "me",
-        "partner"
-      ]
-    },
-    {
       "code": "CZE",
       "who": "me"
     }
