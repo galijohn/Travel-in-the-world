@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>המסע שלנו בעולם</title>
+<!-- Drive serves photos to embedding pages only without a referrer -->
+<meta name="referrer" content="no-referrer">
 <meta name="description" content="גלובוס של כל המקומות שהיינו בהם — יחד ולחוד">
 <link rel="icon" href="icons/map-192.png">
 <meta name="theme-color" content="#05070f">
@@ -120,8 +122,22 @@
     background: none; border: 0; color: var(--muted);
     font-size: 22px; cursor: pointer; line-height: 1;
   }
-  .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
-  .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: zoom-in; }
+  button.album { border: 0; cursor: pointer; font-family: inherit; }
+  .strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+  .strip button, .grid button {
+    position: relative; padding: 0; border: 0; border-radius: 8px; overflow: hidden;
+    width: 100%; height: auto; aspect-ratio: 1; align-self: start;
+    background: rgba(255,255,255,0.06); cursor: pointer;
+  }
+  .strip img, .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .strip .more {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); color: #fff; font-size: 18px; font-weight: 700;
+  }
+  .play {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 26px; text-shadow: 0 2px 8px rgba(0,0,0,.7); pointer-events: none;
+  }
   .album {
     display: inline-block; margin-top: 12px;
     color: var(--bg); background: var(--together);
@@ -129,14 +145,47 @@
     text-decoration: none; font-weight: 500; font-size: 14px;
   }
 
-  .lightbox {
-    position: fixed; inset: 0; z-index: 10;
-    background: rgba(0,0,0,0.9);
-    display: none; align-items: center; justify-content: center;
-    cursor: zoom-out;
+  .gallery {
+    position: fixed; inset: 0; z-index: 8; background: rgba(5,7,15,0.97);
+    display: none; flex-direction: column;
   }
-  .lightbox.open { display: flex; }
-  .lightbox img { max-width: 94%; max-height: 92%; border-radius: 8px; }
+  .gallery.open { display: flex; }
+  .gallery header {
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(14px + env(safe-area-inset-top)) 18px 12px;
+  }
+  .gallery h3 { margin: 0; font-size: 20px; flex: 1; }
+  .gallery .count { color: var(--muted); font-size: 14px; }
+  .icon-btn {
+    background: rgba(255,255,255,0.1); border: 0; color: var(--text);
+    width: 40px; height: 40px; border-radius: 50%; font-size: 22px; cursor: pointer; flex: none;
+  }
+  .grid {
+    flex: 1; overflow-y: auto; padding: 0 18px calc(18px + env(safe-area-inset-bottom));
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: max-content; gap: 8px; align-content: start;
+  }
+
+  .viewer {
+    position: fixed; inset: 0; z-index: 10; background: #000;
+    display: none; align-items: center; justify-content: center;
+  }
+  .viewer.open { display: flex; }
+  .viewer .stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .viewer img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+  .viewer iframe { width: min(100%, 1100px); height: min(100%, 80vh); border: 0; }
+  .viewer .nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,0.12); border: 0; color: #fff;
+    width: 48px; height: 48px; border-radius: 50%; font-size: 26px; cursor: pointer;
+  }
+  .viewer .prev { right: 14px; }
+  .viewer .next { left: 14px; }
+  .viewer .top {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+    background: linear-gradient(rgba(0,0,0,.6), transparent); color: #fff; font-size: 14px;
+  }
 
   .tooltip {
     font-family: "Rubik", system-ui, sans-serif;
@@ -167,6 +216,8 @@
       width: 44px; height: 5px; border: 0; padding: 0;
       background: rgba(255,255,255,0.3); border-radius: 3px; cursor: pointer;
     }
+    .grid { grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 0 4px; }
+    .viewer .nav { display: none; }
     .card { left: 16px; right: 16px; width: auto; top: calc(16px + env(safe-area-inset-top)); bottom: auto; max-height: 40%; }
   }
 </style>
@@ -186,7 +237,20 @@
 </aside>
 
 <div class="card" id="card" role="dialog" aria-live="polite"></div>
-<div class="lightbox" id="lightbox"><img alt=""></div>
+<div class="gallery" id="gallery" role="dialog" aria-modal="true">
+  <header>
+    <button class="icon-btn" id="galleryClose" aria-label="סגירה">×</button>
+    <h3 id="galleryTitle"></h3>
+    <span class="count" id="galleryCount"></span>
+  </header>
+  <div class="grid" id="galleryGrid"></div>
+</div>
+<div class="viewer" id="viewer" role="dialog" aria-modal="true">
+  <div class="stage" id="viewerStage"></div>
+  <div class="top"><span id="viewerCount"></span><button class="icon-btn" id="viewerClose" aria-label="סגירה">×</button></div>
+  <button class="nav prev" id="viewerPrev" aria-label="הקודמת">›</button>
+  <button class="nav next" id="viewerNext" aria-label="הבאה">‹</button>
+</div>
 
 <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
@@ -194,7 +258,12 @@
 <script>
 (async () => {
   const { asList, category, aggregateCountries, countryName, centroid, hexA, esc } = TravelCommon;
-  const [T, countryFeatures] = await Promise.all([TravelCommon.loadSiteData(), TravelCommon.loadCountries()]);
+  const [T, countryFeatures, media] = await Promise.all([
+    TravelCommon.loadSiteData(),
+    TravelCommon.loadCountries(),
+    // photo lists per Drive folder, built by .github/workflows/media.yml
+    fetch("data/media.json?v=" + Date.now()).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+  ]);
   const P = T.people;
   const catInfo = c => TravelCommon.catInfo(P, c);
   const whoLabel = who => TravelCommon.whoLabel(P, who);
@@ -332,13 +401,11 @@
 
   function showPlace(p) {
     flyTo(p.lat, p.lng, 0.9);
-    const photos = (p.photos || []).map(src => `<img src="${esc(src)}" loading="lazy" alt="">`).join("");
     openCard(`
       <h3><span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}</h3>
       <div class="who">${esc(whoLabel(p.who))}${p.date ? " · " + esc(p.date) : ""}${p.code ? " · " + esc(countryName(countryProps(p.code))) : ""}</div>
       ${p.note ? `<p>${esc(p.note)}</p>` : ""}
-      ${photos ? `<div class="photos">${photos}</div>` : ""}
-      ${albumHtml(p.album)}`);
+      ${albumHtml(p.album, p.name)}`);
   }
 
   function showCountry(props) {
@@ -347,22 +414,70 @@
     if (f) { const c = centroid(f); flyTo(c.lat, c.lng, 1.6); }
     const inside = places.filter(p => p.code === props.code);
     const meta = T.countries.find(x => x.code === props.code) || {};
-    const photos = (meta.photos || []).map(src => `<img src="${esc(src)}" loading="lazy" alt="">`).join("");
     openCard(`
       <h3><span class="dot" style="background:${catInfo(category(set)).color}"></span>${esc(countryName(props))}</h3>
       <div class="who">${esc(catInfo(category(set)).name)}</div>
       ${meta.note ? `<p>${esc(meta.note)}</p>` : ""}
       ${inside.length ? `<div class="list" style="border:0;padding:6px 0 0">${inside.map(p =>
         `<button class="item" data-p="${places.indexOf(p)}"><span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}<span class="meta">${esc(p.date || "")}</span></button>`).join("")}</div>` : ""}
-      ${photos ? `<div class="photos">${photos}</div>` : ""}
-      ${albumHtml(meta.album)}`);
+      ${albumHtml(meta.album, countryName(props))}`);
   }
 
-  // Drive blocks showing folders inside other sites (third-party cookies), so link out instead
-  function albumHtml(url) {
+  // --- photos: shown from the shared Drive folder, inside the map -----------
+  const thumb = (id, w) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`;
+  let galleryItems = [], viewerIndex = 0;
+
+  function albumHtml(url, title) {
     if (!url) return "";
-    return `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לתמונות מהטיול</a>`;
+    const items = media[TravelCommon.driveFolderId(url)] || [];
+    // folder not listed yet (just added, or not shared): fall back to opening Drive
+    if (!items.length) return `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לתמונות מהטיול</a>`;
+    const preview = items.slice(0, 4).map((m, i) => `<button data-open="${i}" aria-label="תמונה ${i + 1}">
+        <img src="${thumb(m.id, 300)}" loading="lazy" alt="">${m.video ? `<span class="play">▶</span>` : ""}
+        ${i === 3 && items.length > 4 ? `<span class="more">+${items.length - 3}</span>` : ""}</button>`).join("");
+    return `<div class="strip" data-album="${esc(url)}" data-title="${esc(title)}">${preview}</div>
+      <button class="album" data-gallery="${esc(url)}" data-title="${esc(title)}">📷 כל התמונות (${items.length})</button>`;
   }
+
+  function openGallery(url, title) {
+    galleryItems = media[TravelCommon.driveFolderId(url)] || [];
+    document.getElementById("galleryTitle").textContent = title;
+    document.getElementById("galleryCount").textContent = `${galleryItems.length} תמונות וסרטונים`;
+    document.getElementById("galleryGrid").innerHTML = galleryItems.map((m, i) =>
+      `<button data-i="${i}"><img src="${thumb(m.id, 400)}" loading="lazy" alt="">${m.video ? `<span class="play">▶</span>` : ""}</button>`).join("");
+    document.getElementById("gallery").classList.add("open");
+  }
+
+  function openViewer(i) {
+    viewerIndex = (i + galleryItems.length) % galleryItems.length;
+    const m = galleryItems[viewerIndex];
+    document.getElementById("viewerStage").innerHTML = m.video
+      ? `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(m.id)}/preview" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+      : `<img src="${thumb(m.id, 2000)}" alt="">`;
+    document.getElementById("viewerCount").textContent = `${viewerIndex + 1} מתוך ${galleryItems.length}`;
+    document.getElementById("viewer").classList.add("open");
+    // warm up the next photo so swiping feels instant
+    const next = galleryItems[(viewerIndex + 1) % galleryItems.length];
+    if (next && !next.video) new Image().src = thumb(next.id, 2000);
+  }
+
+  const closeViewer = () => { document.getElementById("viewer").classList.remove("open"); document.getElementById("viewerStage").innerHTML = ""; };
+  document.getElementById("galleryClose").onclick = () => document.getElementById("gallery").classList.remove("open");
+  document.getElementById("galleryGrid").addEventListener("click", e => {
+    const b = e.target.closest("button[data-i]"); if (b) openViewer(+b.dataset.i);
+  });
+  document.getElementById("viewerClose").onclick = closeViewer;
+  document.getElementById("viewerPrev").onclick = () => openViewer(viewerIndex - 1);
+  document.getElementById("viewerNext").onclick = () => openViewer(viewerIndex + 1);
+  // swipe on phones (RTL: swiping left goes back)
+  let touchX = null;
+  const viewerEl = document.getElementById("viewer");
+  viewerEl.addEventListener("touchstart", e => { touchX = e.touches[0].clientX; }, { passive: true });
+  viewerEl.addEventListener("touchend", e => {
+    if (touchX == null) return;
+    const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+    if (Math.abs(dx) > 50) openViewer(viewerIndex + (dx > 0 ? 1 : -1));
+  });
 
   function openCard(html) {
     card.innerHTML = `<button class="close" aria-label="סגור">×</button>` + html;
@@ -373,14 +488,23 @@
     if (e.target.closest(".close")) return card.classList.remove("open");
     const item = e.target.closest(".item[data-p]");
     if (item) return showPlace(places[+item.dataset.p]);
-    const img = e.target.closest(".photos img");
-    if (img) { lightbox.querySelector("img").src = img.src; lightbox.classList.add("open"); }
+    const all = e.target.closest("[data-gallery]");
+    if (all) return openGallery(all.dataset.gallery, all.dataset.title);
+    const one = e.target.closest(".strip [data-open]");
+    if (one) {
+      const strip = one.closest(".strip");
+      openGallery(strip.dataset.album, strip.dataset.title);
+      openViewer(+one.dataset.open);
+    }
   });
-  const lightbox = document.getElementById("lightbox");
-  lightbox.addEventListener("click", () => lightbox.classList.remove("open"));
   addEventListener("keydown", e => {
+    const viewerOpen = viewerEl.classList.contains("open");
+    if (viewerOpen && e.key === "ArrowLeft") return openViewer(viewerIndex + 1);
+    if (viewerOpen && e.key === "ArrowRight") return openViewer(viewerIndex - 1);
     if (e.key !== "Escape") return;
-    lightbox.classList.contains("open") ? lightbox.classList.remove("open") : card.classList.remove("open");
+    if (viewerOpen) closeViewer();
+    else if (document.getElementById("gallery").classList.contains("open")) document.getElementById("gallery").classList.remove("open");
+    else card.classList.remove("open");
   });
 
   // --- helpers -------------------------------------------------------------

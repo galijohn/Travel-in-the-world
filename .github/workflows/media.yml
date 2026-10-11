@@ -1,0 +1,36 @@
+name: Sync photo lists from Google Drive
+
+on:
+  push:
+    paths: ["data/places.js"]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-media
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/sync-media.mjs
+      - name: Commit updated list
+        run: |
+          if git diff --quiet -- data/media.json && git ls-files --error-unmatch data/media.json >/dev/null 2>&1; then
+            echo "No changes"; exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add data/media.json
+          git commit -m "Update photo lists from Google Drive"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push

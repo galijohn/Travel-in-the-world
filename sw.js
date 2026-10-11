@@ -1,6 +1,6 @@
 // Offline support: pages and data are network-first (always fresh when online),
 // heavy static files are cache-first.
-const CACHE = "travel-v2";
+const CACHE = "travel-v3";
 const SHELL = [
   "./", "index.html", "edit.html",
   "assets/common.js", "assets/earth.jpg", "assets/night-sky.png",
@@ -31,8 +31,8 @@ self.addEventListener("fetch", e => {
   if (staticFile) {
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => put(req, res))));
   } else {
-    // ignore the ?v= cache-buster so the offline copy of places.js is found
-    const key = url.pathname.endsWith("places.js") ? new Request(url.origin + url.pathname) : req;
+    // ignore the ?v= cache-buster so the offline copy of the data files is found
+    const key = /(places\.js|media\.json)$/.test(url.pathname) ? new Request(url.origin + url.pathname) : req;
     e.respondWith(fetch(req).then(res => put(key, res)).catch(() => caches.match(key)));
   }
 });
