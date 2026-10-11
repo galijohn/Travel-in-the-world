@@ -53,12 +53,6 @@ window.TravelCommon = (() => {
     return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  // Google Drive folder link -> folder id (null for any other link)
-  function driveFolderId(url) {
-    const m = String(url || "").match(/drive\.google\.com\/(?:drive\/(?:u\/\d+\/)?folders\/|open\?id=)([\w-]+)/);
-    return m ? m[1] : null;
-  }
-
   // Photo-real Earth: NASA imagery, terrain relief, shiny oceans and a slowly drifting cloud layer.
   function realisticGlobe(globe) {
     globe
@@ -104,5 +98,5 @@ window.TravelCommon = (() => {
       .then(geo => geo.features.filter(f => f.properties.code !== "ATA"));
   }
 
-  return { SEPARATE, asList, category, catInfo, whoLabel, aggregateCountries, countryName, centroid, hexA, esc, driveFolderId, realisticGlobe, loadSiteData, loadCountries };
+  return { SEPARATE, asList, category, catInfo, whoLabel, aggregateCountries, countryName, centroid, hexA, esc, realisticGlobe, loadSiteData, loadCountries };
 })();

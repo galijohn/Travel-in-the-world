@@ -122,10 +122,6 @@
   }
   .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
   .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: zoom-in; }
-  .drive {
-    display: block; width: 100%; height: 260px; margin-top: 12px;
-    border: 0; border-radius: 10px; background: #fff;
-  }
   .album {
     display: inline-block; margin-top: 12px;
     color: var(--bg); background: var(--together);
@@ -362,12 +358,10 @@
       ${albumHtml(meta.album)}`);
   }
 
-  // a shared Drive folder shows as a thumbnail grid; any other link is just a button
+  // Drive blocks showing folders inside other sites (third-party cookies), so link out instead
   function albumHtml(url) {
     if (!url) return "";
-    const id = TravelCommon.driveFolderId(url);
-    return (id ? `<iframe class="drive" src="https://drive.google.com/embeddedfolderview?id=${esc(id)}#grid" loading="lazy" title="תמונות"></iframe>` : "") +
-      `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לכל התמונות</a>`;
+    return `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לתמונות מהטיול</a>`;
   }
 
   function openCard(html) {
