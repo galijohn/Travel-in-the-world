@@ -26,6 +26,10 @@ window.TRAVEL = {
     {
       "code": "CZE",
       "who": "me"
+    },
+    {
+      "code": "EGY",
+      "who": "together"
     }
   ],
   "places": [
@@ -37,6 +41,15 @@ window.TRAVEL = {
       "who": "me",
       "album": "https://drive.google.com/drive/u/0/folders/16ew7w1pCK4C4SIxz2nipUd1x6MJkaq_W",
       "date": "2026-04"
+    },
+    {
+      "name": "חצי האי סִינַי",
+      "code": "EGY",
+      "lat": 29.5232,
+      "lng": 33.8055,
+      "who": "together",
+      "album": "https://drive.google.com/drive/folders/1OFYQ0UJek3j5YY0fLFQuOWIxu8sVUHev?usp=drive_link",
+      "date": "2018-11"
     }
   ]
 };
