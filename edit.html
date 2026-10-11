@@ -216,6 +216,7 @@
   </form>
 </dialog>
 
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
 <script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
 <script src="assets/common.js"></script>
 <script>
@@ -258,10 +259,6 @@
   // --- globe ---------------------------------------------------------------
   const el = document.getElementById("globe");
   const globe = Globe()(el)
-    .globeImageUrl("assets/earth.jpg")
-    .backgroundImageUrl("assets/night-sky.png")
-    .atmosphereColor("#7aa2ff")
-    .atmosphereAltitude(0.18)
     .polygonsData(countryFeatures)
     .polygonSideColor(() => "rgba(0,0,0,0.15)")
     .polygonStrokeColor(() => "rgba(255,255,255,0.25)")
@@ -275,6 +272,7 @@
     .pointColor(p => p === selected ? "#ffffff" : catInfo(catOf(p)).color)
     .pointLabel(p => `<div class="tooltip"><b>${esc(p.name || "מקום חדש")}</b></div>`)
     .onPointClick(p => { if (!pickMode) selectPlace(p, true); });
+  TravelCommon.realisticGlobe(globe);
   globe.pointOfView({ lat: 32, lng: 35, altitude: 2.3 });
   const onResize = () => globe.width(innerWidth).height(innerHeight);
   addEventListener("resize", onResize);
@@ -287,7 +285,7 @@
         const code = f.properties.code;
         if (tab === "countries" && selected && selected.code === code && !("lat" in selected)) return "rgba(255,255,255,0.6)";
         const set = agg.get(code);
-        return set && set.size ? hexA(catInfo(category(set)).color, 0.55) : "rgba(0,0,0,0)";
+        return set && set.size ? hexA(catInfo(category(set)).color, 0.45) : "rgba(0,0,0,0)";
       })
       .polygonAltitude(f => agg.has(f.properties.code) ? 0.012 : 0.004)
       .pointsData(data.places.filter(p => p.lat != null));

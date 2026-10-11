@@ -1,10 +1,12 @@
 // Offline support: pages and data are network-first (always fresh when online),
 // heavy static files are cache-first.
-const CACHE = "travel-v1";
+const CACHE = "travel-v2";
 const SHELL = [
   "./", "index.html", "edit.html",
   "assets/common.js", "assets/earth.jpg", "assets/night-sky.png",
+  "assets/earth-topology.png", "assets/earth-water.png", "assets/clouds-alpha.jpg",
   "data/countries.geojson", "data/places.js",
+  "https://unpkg.com/three@0.160.0/build/three.min.js",
   "https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js",
 ];
 

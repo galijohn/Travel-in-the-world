@@ -59,6 +59,34 @@ window.TravelCommon = (() => {
     return m ? m[1] : null;
   }
 
+  // Photo-real Earth: NASA imagery, terrain relief, shiny oceans and a slowly drifting cloud layer.
+  function realisticGlobe(globe) {
+    globe
+      .globeImageUrl("assets/earth.jpg")
+      .bumpImageUrl("assets/earth-topology.png")
+      .backgroundImageUrl("assets/night-sky.png")
+      .atmosphereColor("#9cc8ff")
+      .atmosphereAltitude(0.16);
+    if (!window.THREE) return;
+    const loader = new THREE.TextureLoader();
+    loader.load("assets/earth-water.png", tex => {
+      const mat = globe.globeMaterial();
+      mat.specularMap = tex;
+      mat.specular.setRGB(0.45, 0.45, 0.45);
+      mat.shininess = 18;
+      mat.needsUpdate = true;
+    });
+    loader.load("assets/clouds-alpha.jpg", tex => {
+      const clouds = new THREE.Mesh(
+        new THREE.SphereGeometry(globe.getGlobeRadius() * 1.006, 75, 75),
+        new THREE.MeshPhongMaterial({ color: 0xffffff, alphaMap: tex, transparent: true, opacity: 0.85, depthWrite: false })
+      );
+      clouds.raycast = () => {}; // clicks go through to the globe
+      globe.scene().add(clouds);
+      (function drift() { clouds.rotation.y -= 0.00012; requestAnimationFrame(drift); })();
+    });
+  }
+
   // Load data/places.js bypassing the browser cache so edits show up quickly.
   function loadSiteData() {
     return new Promise((resolve, reject) => {
@@ -76,5 +104,5 @@ window.TravelCommon = (() => {
       .then(geo => geo.features.filter(f => f.properties.code !== "ATA"));
   }
 
-  return { SEPARATE, asList, category, catInfo, whoLabel, aggregateCountries, countryName, centroid, hexA, esc, driveFolderId, loadSiteData, loadCountries };
+  return { SEPARATE, asList, category, catInfo, whoLabel, aggregateCountries, countryName, centroid, hexA, esc, driveFolderId, realisticGlobe, loadSiteData, loadCountries };
 })();
