@@ -137,6 +137,25 @@
     padding: 6px 10px; border-radius: 8px; font-size: 13px; color: var(--text);
   }
 
+  /* login: the editor stays hidden until the GitHub key checks out */
+  .login {
+    position: fixed; inset: 0; z-index: 20; display: none;
+    align-items: center; justify-content: center; padding: 16px;
+    background: rgba(5, 7, 15, 0.55);
+  }
+  body.locked .login { display: flex; }
+  body.locked .panel, body.locked .banner { display: none; }
+  .login-card {
+    width: min(420px, 100%); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 18px; padding: 22px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  .login-card h1 { margin: 0 0 4px; font-size: 22px; }
+  .login-card .sub { color: var(--muted); margin: 0 0 16px; }
+  .login-card .btn.primary { width: 100%; justify-content: center; padding: 10px; font-size: 16px; }
+  .login-error { color: var(--danger); min-height: 1.2em; line-height: 1.5; }
+  .login-card ol { padding-inline-start: 18px; margin: 6px 0; line-height: 1.6; }
+  .login-card a { color: var(--accent); }
+
   @media (max-width: 700px) {
     .panel {
       top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 58%;
@@ -150,16 +169,41 @@
     .topbar { padding-top: 12px; }
     /* 16px stops iOS from zooming into focused fields */
     input[type=text], input[type=url], input[type=password], input[type=number], input[type=month], select, textarea { font-size: 16px; }
+    .login { align-items: flex-start; padding-top: calc(40px + env(safe-area-inset-top)); }
     .btn, .who-toggle button, .item { min-height: 40px; }
     .toast { left: 12px; right: 12px; bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
     .banner { top: calc(16px + env(safe-area-inset-top)); white-space: nowrap; }
   }
 </style>
 </head>
-<body>
+<body class="locked">
 <div id="globe"></div>
 <div class="banner" id="banner"><span id="bannerText"></span><button id="bannerCancel">ביטול</button></div>
 <div class="toast" id="toast"></div>
+
+<div class="login" id="login">
+  <form class="login-card stack" id="loginForm" autocomplete="on">
+    <div>
+      <h1>✏️ עריכת המפה</h1>
+      <p class="sub">כניסה עם מפתח ה-GitHub שלך</p>
+    </div>
+    <input type="hidden" name="username" autocomplete="username" value="travel-map">
+    <input type="password" name="token" autocomplete="current-password" placeholder="github_pat_..." dir="ltr" required>
+    <div class="login-error" id="loginError" role="alert"></div>
+    <button class="btn primary" id="loginBtn">כניסה</button>
+    <details class="hint">
+      <summary>איך יוצרים מפתח?</summary>
+      <ol>
+        <li>נכנסים ל-<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">יצירת Fine-grained token</a></li>
+        <li>Repository access ← <b>Only select repositories</b> ← Travel-in-the-world</li>
+        <li>Permissions ← Repository permissions ← <b>Contents: Read and write</b></li>
+        <li>Generate token, מעתיקים ומדביקים כאן</li>
+      </ol>
+      המפתח נשמר רק במכשיר הזה.
+    </details>
+    <a class="hint" href="./">👁️ לצפייה במפה</a>
+  </form>
+</div>
 
 <aside class="panel" id="panel">
   <div class="topbar">
@@ -180,18 +224,19 @@
   <form method="dialog" class="stack" id="settingsForm">
     <h3>⚙️ הגדרות</h3>
     <div>
-      <label class="f">מפתח גישה ל-GitHub (token)</label>
-      <input type="password" name="token" autocomplete="off" placeholder="github_pat_...">
+      <label class="f">מפתח גוגל, להצגת תמונות מיידית מדרייב</label>
+      <input type="text" name="google_key" dir="ltr" autocomplete="off" placeholder="AIza...">
       <details class="hint" style="margin-top:6px">
-        <summary>איך יוצרים מפתח?</summary>
+        <summary>איך יוצרים מפתח גוגל?</summary>
         <ol>
-          <li>נכנסים ל-<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">יצירת Fine-grained token</a></li>
-          <li>שם: travel-map. תוקף: כמה שרוצים</li>
-          <li>Repository access ← <b>Only select repositories</b> ← בוחרים את Travel-in-the-world</li>
-          <li>Permissions ← Repository permissions ← <b>Contents: Read and write</b></li>
-          <li>Generate token, מעתיקים ומדביקים כאן</li>
+          <li>נכנסים ל-<a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">יצירת פרויקט ב-Google Cloud</a>, שם: travel-map ← Create</li>
+          <li>נכנסים ל-<a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Google Drive API</a> ← <b>Enable</b></li>
+          <li>נכנסים ל-<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credentials</a> ← <b>Create credentials</b> ← <b>API key</b></li>
+          <li>במפתח שנוצר: Application restrictions ← <b>Websites</b> ← מוסיפים <code dir="ltr">https://galijohn.github.io/*</code></li>
+          <li>API restrictions ← <b>Restrict key</b> ← Google Drive API ← Save</li>
+          <li>מעתיקים את המפתח ומדביקים כאן</li>
         </ol>
-        המפתח נשמר רק בדפדפן הזה ולא נשלח לשום מקום חוץ מ-GitHub.
+        המפתח נשמר בקובץ המפה ויכול לקרוא רק תיקיות ששיתפת ב"כל מי שיש לו את הקישור".
       </details>
     </div>
     <details class="hint">
@@ -315,7 +360,6 @@
         }
         loadError = "";
       } catch (e) {
-        toast(e.message, true);
         data = normalize(await TravelCommon.loadSiteData());
         fileSha = null;
         loadError = e.message;
@@ -368,6 +412,7 @@
       return o;
     };
     const out = {
+      ...(data.googleApiKey ? { googleApiKey: data.googleApiKey } : {}),
       people: data.people,
       countries: data.countries.map(clean),
       places: data.places.map(clean),
@@ -422,7 +467,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   }
 
   async function save() {
-    if (!settings.token) return openSettings();
+    if (!settings.token) return showLogin("");
     const btn = document.getElementById("saveBtn");
     btn.disabled = true;
     try {
@@ -549,9 +594,8 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
     const s = document.getElementById("status");
     const conn = settings.token
       ? (!loadError ? `<span class="pill ok">מחובר ל-GitHub · ${esc(settings.branch)}</span>` : `<span class="pill error">⚠️ ${esc(loadError)}</span>`)
-      : `<span class="pill warn">לא מחובר · אפשר לערוך אבל לא לשמור</span> <a href="#" id="connectLink">התחברות</a>`;
+      : `<span class="pill warn">לא מחובר</span>`;
     s.innerHTML = conn + (dirty ? `<span class="pill warn">יש שינויים שלא נשמרו</span>` : "");
-    document.getElementById("connectLink")?.addEventListener("click", e => { e.preventDefault(); openSettings(); });
     document.getElementById("saveBtn").disabled = !dirty;
   }
 
@@ -724,7 +768,7 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   const dlg = document.getElementById("settings");
   const form = document.getElementById("settingsForm");
   function openSettings() {
-    form.token.value = settings.token;
+    form.google_key.value = data.googleApiKey || "";
     form.owner.value = settings.owner;
     form.repo.value = settings.repo;
     form.branch.value = settings.branch;
@@ -738,7 +782,6 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   // the back button, or the page reloads after visiting GitHub to create the token.
   let appliedConn = "";
   const formSettings = () => ({
-    token: form.token.value.trim(),
     owner: form.owner.value.trim(),
     repo: form.repo.value.trim(),
     branch: form.branch.value.trim(),
@@ -763,12 +806,58 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
       const v = form["name_" + k].value.trim();
       if (v && v !== data.people[k].name) { data.people[k].name = v; markDirty(); }
     }
+    const key = form.google_key.value.trim();
+    if (key !== (data.googleApiKey || "")) {
+      data.googleApiKey = key; markDirty();
+      if (key) checkGoogleKey(key);
+    }
     renderAll();
   });
+
+  // Try the Google key on one of the linked folders and say plainly what is wrong
+  async function checkGoogleKey(key) {
+    const folder = [...data.places, ...data.countries].map(o => TravelCommon.driveFolderId(o.album)).find(Boolean);
+    if (!folder) return toast("מפתח גוגל נשמר. הוא ייבדק כשתקשר תיקייה מדרייב.");
+    try {
+      const q = encodeURIComponent(`'${folder}' in parents`);
+      const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&pageSize=1&fields=files(id)&key=${encodeURIComponent(key)}`,
+        { referrerPolicy: "strict-origin-when-cross-origin" });
+      if (r.ok) return toast("מפתח גוגל עובד ✓ לחצו שמירה כדי להפעיל אותו במפה");
+      const j = await r.json().catch(() => ({}));
+      const msg = j.error?.message || "";
+      toast(
+        /not been used|disabled/i.test(msg) ? "מפתח גוגל: צריך להפעיל את Google Drive API בפרויקט (Enable)." :
+        /referer|referrer/i.test(msg) ? "מפתח גוגל: ההגבלה לאתר לא תואמת. צריך להוסיף https://galijohn.github.io/* תחת Websites." :
+        /API key not valid/i.test(msg) ? "מפתח גוגל לא תקין. כדאי להעתיק אותו שוב." :
+        "מפתח גוגל לא עובד: " + (msg || r.status), true);
+    } catch { toast("לא הצלחתי לבדוק את מפתח גוגל (אין אינטרנט?)", true); }
+  }
   document.getElementById("logoutBtn").onclick = () => {
+    if (dirty && !confirm("יש שינויים שלא נשמרו. להתנתק בכל זאת?")) return;
     settings.token = ""; writeLS("travelEditor", settings);
-    dlg.close(); renderAll();
+    dirty = false; selected = null;
+    dlg.close("cancel"); showLogin("");
   };
+
+  // --- login -----------------------------------------------------------------
+  const loginForm = document.getElementById("loginForm");
+  function showLogin(error) {
+    document.body.classList.add("locked");
+    document.getElementById("loginError").textContent = error || "";
+    loginForm.token.value = settings.token || "";
+    setPick(null);
+  }
+  loginForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const btn = document.getElementById("loginBtn");
+    btn.disabled = true; btn.textContent = "בודק...";
+    settings.token = loginForm.token.value.trim();
+    writeLS("travelEditor", settings);
+    await load();
+    btn.disabled = false; btn.textContent = "כניסה";
+    if (loadError) showLogin(loadError);
+    else document.body.classList.remove("locked");
+  });
 
   document.getElementById("saveBtn").onclick = save;
   addEventListener("keydown", e => {
@@ -787,7 +876,8 @@ window.TRAVEL = ${JSON.stringify(out, null, 2)};
   }
 
   await load();
-  if (!settings.token) openSettings();
+  if (settings.token && !loadError) document.body.classList.remove("locked");
+  else showLogin(settings.token ? loadError : "");
 })();
 </script>
 <script>

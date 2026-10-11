@@ -405,7 +405,7 @@
       <h3><span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}</h3>
       <div class="who">${esc(whoLabel(p.who))}${p.date ? " · " + esc(p.date) : ""}${p.code ? " · " + esc(countryName(countryProps(p.code))) : ""}</div>
       ${p.note ? `<p>${esc(p.note)}</p>` : ""}
-      ${albumHtml(p.album, p.name)}`);
+      ${albumSlot(p.album, p.name)}`);
   }
 
   function showCountry(props) {
@@ -420,17 +420,58 @@
       ${meta.note ? `<p>${esc(meta.note)}</p>` : ""}
       ${inside.length ? `<div class="list" style="border:0;padding:6px 0 0">${inside.map(p =>
         `<button class="item" data-p="${places.indexOf(p)}"><span class="dot" style="background:${catInfo(p.cat).color}"></span>${esc(p.name)}<span class="meta">${esc(p.date || "")}</span></button>`).join("")}</div>` : ""}
-      ${albumHtml(meta.album, countryName(props))}`);
+      ${albumSlot(meta.album, countryName(props))}`);
   }
 
   // --- photos: shown from the shared Drive folder, inside the map -----------
   const thumb = (id, w) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w}`;
   let galleryItems = [], viewerIndex = 0;
 
-  function albumHtml(url, title) {
+  // Photos of a Drive folder. With a Google API key (set in the editor) they are read live
+  // from Drive; otherwise, or if that fails, from data/media.json built by the GitHub Action.
+  const mediaCache = new Map();
+  function folderMedia(url) {
+    const id = TravelCommon.driveFolderId(url);
+    if (!id) return Promise.resolve([]);
+    if (!mediaCache.has(id)) {
+      const fallback = () => media[id] || [];
+      mediaCache.set(id, T.googleApiKey ? listDriveFolder(id).catch(fallback) : Promise.resolve(fallback()));
+    }
+    return mediaCache.get(id);
+  }
+
+  async function listDriveFolder(id, depth = 0) {
+    const items = [];
+    let pageToken = "";
+    do {
+      const q = encodeURIComponent(`'${id}' in parents and trashed = false`);
+      const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000&orderBy=name&key=${encodeURIComponent(T.googleApiKey)}${pageToken ? "&pageToken=" + pageToken : ""}`;
+      // the key is restricted to this site, so this request must carry the page's origin
+      const r = await fetch(url, { referrerPolicy: "strict-origin-when-cross-origin" });
+      if (!r.ok) throw new Error("Drive " + r.status);
+      const j = await r.json();
+      for (const f of j.files) {
+        if (f.mimeType === "application/vnd.google-apps.folder") { if (depth < 2) items.push(...await listDriveFolder(f.id, depth + 1)); }
+        else if (f.mimeType.startsWith("image/")) items.push({ id: f.id, name: f.name });
+        else if (f.mimeType.startsWith("video/")) items.push({ id: f.id, name: f.name, video: true });
+      }
+      pageToken = j.nextPageToken || "";
+    } while (pageToken);
+    return depth ? items : items.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // the card opens at once; its photos fill in when the list arrives
+  function albumSlot(url, title) {
     if (!url) return "";
-    const items = media[TravelCommon.driveFolderId(url)] || [];
-    // folder not listed yet (just added, or not shared): fall back to opening Drive
+    folderMedia(url).then(items => {
+      const slot = card.querySelector(".album-slot");
+      if (slot && slot.dataset.album === url) slot.innerHTML = albumHtml(url, title, items);
+    });
+    return `<div class="album-slot" data-album="${esc(url)}"><div class="strip">${"<button disabled></button>".repeat(4)}</div></div>`;
+  }
+
+  function albumHtml(url, title, items) {
+    // folder not listed (not shared, or just added without a key): fall back to opening Drive
     if (!items.length) return `<a class="album" href="${esc(url)}" target="_blank" rel="noopener">📷 לתמונות מהטיול</a>`;
     const preview = items.slice(0, 4).map((m, i) => `<button data-open="${i}" aria-label="תמונה ${i + 1}">
         <img src="${thumb(m.id, 300)}" loading="lazy" alt="">${m.video ? `<span class="play">▶</span>` : ""}
@@ -439,8 +480,8 @@
       <button class="album" data-gallery="${esc(url)}" data-title="${esc(title)}">📷 כל התמונות (${items.length})</button>`;
   }
 
-  function openGallery(url, title) {
-    galleryItems = media[TravelCommon.driveFolderId(url)] || [];
+  async function openGallery(url, title) {
+    galleryItems = await folderMedia(url);
     document.getElementById("galleryTitle").textContent = title;
     document.getElementById("galleryCount").textContent = `${galleryItems.length} תמונות וסרטונים`;
     document.getElementById("galleryGrid").innerHTML = galleryItems.map((m, i) =>
@@ -493,8 +534,7 @@
     const one = e.target.closest(".strip [data-open]");
     if (one) {
       const strip = one.closest(".strip");
-      openGallery(strip.dataset.album, strip.dataset.title);
-      openViewer(+one.dataset.open);
+      openGallery(strip.dataset.album, strip.dataset.title).then(() => openViewer(+one.dataset.open));
     }
   });
   addEventListener("keydown", e => {
