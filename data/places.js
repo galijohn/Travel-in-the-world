@@ -9,11 +9,11 @@
 window.TRAVEL = {
   "people": {
     "me": {
-      "name": "אני",
+      "name": "גלי",
       "color": "#4cc9f0"
     },
     "partner": {
-      "name": "זוגתי",
+      "name": "רוזית",
       "color": "#f72585"
     },
     "together": {
