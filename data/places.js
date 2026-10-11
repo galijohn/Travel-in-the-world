@@ -7,6 +7,7 @@
 // =====================================================================
 
 window.TRAVEL = {
+  "googleApiKey": "AIzaSyDT4_Elqc3oi3qNchpMuRNf01IScK9LZYs",
   "people": {
     "me": {
       "name": "גלי",
